@@ -149,8 +149,8 @@ def mrinfo(image_path, field): #pylint: disable=unused-variable
   command = [ run.exe_name(run.version_match('mrinfo')), image_path, '-' + field ]
   if app.VERBOSITY > 1:
     app.console('Command: \'' + ' '.join(command) + '\' (piping data to local storage)')
-  proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=None)
-  result, dummy_err = proc.communicate()
+  with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=None) as proc:
+    result, dummy_err = proc.communicate()
   result = result.rstrip().decode('utf-8')
   if app.VERBOSITY > 1:
     app.console('Result: ' + result)
@@ -239,14 +239,23 @@ def statistics(image_path, **kwargs): #pylint: disable=unused-variable
   if app.VERBOSITY > 1:
     app.console('Command: \'' + ' '.join(command) + '\' (piping data to local storage)')
 
-  proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=None)
-  stdout = proc.communicate()[0]
-  if proc.returncode:
-    raise MRtrixError('Error trying to calculate statistics from image \'' + image_path + '\'')
+  try:
+    from subprocess import DEVNULL #pylint: disable=import-outside-toplevel
+  except ImportError:
+    DEVNULL = open(os.devnull, 'wb') #pylint: disable=consider-using-with
+  with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=DEVNULL) as proc:
+    stdout = proc.communicate()[0]
+    try:
+      DEVNULL.close()
+    except AttributeError:
+      pass
+    if proc.returncode:
+      raise MRtrixError('Error trying to calculate statistics from image \'' + image_path + '\'')
+
   stdout_lines = [ line.strip() for line in stdout.decode('cp437').splitlines() ]
   result = [ ]
   for line in stdout_lines:
-    line = line.split()
+    line = line.replace('N/A', 'nan').split()
     assert len(line) == len(IMAGE_STATISTICS)
     result.append(ImageStatistics(float(line[0]), float(line[1]), float(line[2]), float(line[3]), float(line[4]), float(line[5]), int(line[6])))
   if len(result) == 1:
