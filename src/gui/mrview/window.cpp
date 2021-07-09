@@ -255,7 +255,7 @@ namespace MR
           GUI::App::set_main_window (this, glarea);
           GUI::Dialog::init();
 
-          setDockOptions (AllowTabbedDocks | VerticalTabs);
+          setDockOptions (AllowTabbedDocks);
           setDocumentMode (true);
 
           //CONF option: IconSize
@@ -273,7 +273,7 @@ namespace MR
           QMenu* menu;
           QToolButton* button;
 
-          setTabPosition (Qt::AllDockWidgetAreas, QTabWidget::East);
+          setTabPosition (Qt::AllDockWidgetAreas, QTabWidget::North);
 
           //CONF option: MRViewDockFloating
           //CONF default: 0 (false)
