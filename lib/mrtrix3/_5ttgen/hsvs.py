@@ -18,8 +18,7 @@
 
 
 
-import glob, os, re
-from distutils.spawn import find_executable
+import glob, os, re, shutil
 from mrtrix3 import MRtrixError
 from mrtrix3 import app, fsl, image, path, run
 
@@ -204,7 +203,7 @@ def execute(): #pylint: disable=unused-variable
     app.warn('Environment variable FSLDIR is not set; script will run without FSL components')
 
   acpc_string = 'anterior ' + ('& posterior commissures' if ATTEMPT_PC else 'commissure')
-  have_acpcdetect = bool(find_executable('acpcdetect')) and 'ARTHOME' in os.environ
+  have_acpcdetect = bool(shutil.which('acpcdetect')) and 'ARTHOME' in os.environ
   if have_acpcdetect:
     if have_fast:
       app.console('ACPCdetect and FSL FAST will be used for explicit segmentation of ' + acpc_string)
@@ -549,7 +548,7 @@ def execute(): #pylint: disable=unused-variable
     acpcdetect_input_header = image.Header(acpcdetect_input_image)
     acpcdetect_output_path = os.path.splitext(acpcdetect_input_image)[0] + '_ACPC.txt'
     app.cleanup(acpcdetect_input_image)
-    with open(acpcdetect_output_path, 'r') as acpc_file:
+    with open(acpcdetect_output_path, 'r', encoding='utf-8') as acpc_file:
       acpcdetect_output_data = acpc_file.read().splitlines()
     app.cleanup(glob.glob(os.path.splitext(acpcdetect_input_image)[0] + "*"))
     # Need to scan through the contents of this file,

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 # Copyright (c) 2008-2022 the MRtrix3 contributors.
 #
@@ -116,7 +116,7 @@ def execute(): #pylint: disable=unused-variable
   sgm_lut = {}
   sgm_lut_file_name = 'FreeSurferSGM.txt'
   sgm_lut_file_path = os.path.join(path.shared_data_path(), path.script_subdir_name(), sgm_lut_file_name)
-  with open(sgm_lut_file_path) as sgm_lut_file:
+  with open(sgm_lut_file_path, encoding='utf-8') as sgm_lut_file:
     for line in sgm_lut_file:
       line = line.rstrip()
       if line and line[0]!='#':
@@ -174,5 +174,5 @@ def execute(): #pylint: disable=unused-variable
 
 
 # Execute the script
-import mrtrix3
+import mrtrix3 #pylint: disable=wrong-import-position
 mrtrix3.execute() #pylint: disable=no-member

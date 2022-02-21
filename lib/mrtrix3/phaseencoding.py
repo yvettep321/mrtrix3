@@ -20,7 +20,6 @@
 
 
 from mrtrix3 import COMMAND_HISTORY_STRING, MRtrixError
-from mrtrix3.utils import STRING_TYPES
 
 
 
@@ -31,14 +30,14 @@ def direction(string): #pylint: disable=unused-variable
   try:
     pe_axis = abs(int(string))
     if pe_axis > 2:
-      raise MRtrixError('When specified as a number, phase encode axis must be either 0, 1 or 2 (positive or negative)')
+      raise MRtrixError('When specified as a number, phase encoding axis must be either 0, 1 or 2 (positive or negative)')
     reverse = (string.contains('-')) # Allow -0
     pe_dir = [0,0,0]
     if reverse:
       pe_dir[pe_axis] = -1
     else:
       pe_dir[pe_axis] = 1
-  except:
+  except ValueError:
     string = string.lower()
     if string == 'lr':
       pe_dir = [1,0,0]
@@ -65,7 +64,7 @@ def direction(string): #pylint: disable=unused-variable
     elif string == 'k-':
       pe_dir = [0,0,-1]
     else:
-      raise MRtrixError('Unrecognized phase encode direction specifier: ' + string)
+      raise MRtrixError('Unrecognized phase encode direction specifier: ' + string) # pylint: disable=raise-missing-from
   app.debug(string + ' -> ' + str(pe_dir))
   return pe_dir
 
@@ -76,7 +75,7 @@ def direction(string): #pylint: disable=unused-variable
 def get_scheme(arg): #pylint: disable=unused-variable
   from mrtrix3 import app, image #pylint: disable=import-outside-toplevel
   if not isinstance(arg, image.Header):
-    if not isinstance(arg, STRING_TYPES):
+    if not isinstance(arg, str):
       raise TypeError('Error trying to derive phase-encoding scheme from \'' + str(arg) + '\': Not an image header or file path')
     arg = image.Header(arg)
   if 'pe_scheme' in arg.keyval():
@@ -111,7 +110,7 @@ def save(filename, scheme, **kwargs): #pylint: disable=unused-variable
                       '(contains ' + str(len(scheme[0])) + ' columns rather than 4)')
 
   if header:
-    if isinstance(header, STRING_TYPES):
+    if isinstance(header, str):
       header = { 'comments' : header }
     elif isinstance(header, list):
       header = { 'comments' : '\n'.join(str(entry) for entry in header) }
@@ -128,7 +127,7 @@ def save(filename, scheme, **kwargs): #pylint: disable=unused-variable
     else:
       header['command_history'] = COMMAND_HISTORY_STRING
 
-  with open(filename, 'w') as outfile:
+  with open(filename, 'w', encoding='utf-8') as outfile:
     for key, value in sorted(header.items()):
       for line in value.splitlines():
         outfile.write('# ' + key + ': ' + line + '\n')
