@@ -1,6 +1,22 @@
 Beginner DWI tutorial
 =====================
 
+.. TIP::
+
+  Some proficiency with the Unix command-line is required to make the best use
+  of this software. There are many resources online to help you get
+  started if you are not already familiar with it. We also recommend our own
+  `Introduction to the Unix command-line
+  <https://command-line-tutorial.readthedocs.io/>`__, which was written with a
+  particular focus on the types of use that are common when using *MRtrix3*.
+
+.. WARNING::
+
+  This tutorial is not intended to show the optimal or even recommended way of
+  processing. It is merely a simplified example, intended to familiarise the
+  user with the typical command line interface of certain basic processing
+  steps.
+
 This tutorial will hopefully provide enough information for a novice
 user to get from the raw DW image data to performing some streamlines
 tractography. It may also be useful for experienced MRtrix users in
@@ -20,9 +36,15 @@ this can be used to correct the susceptibility-induced geometric
 distortions present in the diffusion images, as well as any eddy
 current-induced distortions and inter-volume subject motion. Procedures
 for this correct are not yet implemented in *MRtrix3*, though we do provide
-a script called ``dwipreproc`` for interfacing with the relevant FSL tools.
-Due to the nuances of the operation of this script, the reader is referred
-to the :ref:`dwipreproc_page` page.
+a script for interfacing with the relevant FSL tools:
+
+``dwifslpreproc <Input DWI series> <Output corrected DWI series> [options]``
+
+For more details, see the :ref:`dwifslpreproc` help file. In
+particular, it is necessary to manually specify what type of reversed
+phase-encoding acquisition has taken place (if any), and potentially
+provide additional relevant input images or provide details of the
+phase encoding scheme used in the acquisition.
 
 DWI brain mask estimation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,7 +70,7 @@ Response function estimation
 To perform spherical deconvolution, the DWI signal emanating from a
 single coherently-oriented fibre bundle must be estimated. We provide a
 script for doing this, which has :ref:`a range of algorithms and
-parameters <response_fn_estimation>`. This example will use
+parameters <response_function_estimation>`. This example will use
 fairly sensible defaults:
 
 .. code::
@@ -95,4 +117,8 @@ particularly when a very large number of streamlines is generated.
 
     $ tckmap <Input track file> <Output TDI> -vox <Voxel size in mm>
     $ mrview <Output TDI>
+
+
+
+
 

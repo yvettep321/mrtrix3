@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_tractography_mapping_gaussian_voxel_h__
 #define __dwi_tractography_mapping_gaussian_voxel_h__
@@ -78,18 +80,18 @@ namespace MR {
             public:
             VoxelDEC () : Base (), VoxelAddon () { }
             VoxelDEC (const Eigen::Vector3i& V) : Base (V), VoxelAddon () { }
-            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3& d) : Base (V, d), VoxelAddon () { }
-            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3& d, const default_type l) : Base (V, d, l), VoxelAddon () { }
-            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3& d, const default_type l, const default_type f) : Base (V, d, l), VoxelAddon (f) { }
+            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3d& d) : Base (V, d), VoxelAddon () { }
+            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3d& d, const default_type l) : Base (V, d, l), VoxelAddon () { }
+            VoxelDEC (const Eigen::Vector3i& V, const Eigen::Vector3d& d, const default_type l, const default_type f) : Base (V, d, l), VoxelAddon (f) { }
 
             VoxelDEC& operator=  (const VoxelDEC& V)   { Base::operator= (V); VoxelAddon::operator= (V); return (*this); }
             void operator+= (const default_type) const { assert (0); }
-            void operator+= (const Eigen::Vector3&) const { assert (0); }
+            void operator+= (const Eigen::Vector3d&) const { assert (0); }
             bool operator== (const VoxelDEC& V) const { return Base::operator== (V); }
             bool operator<  (const VoxelDEC& V) const { return Base::operator<  (V); }
 
-            void add (const Eigen::Vector3&, const default_type) const { assert (0); }
-            void add (const Eigen::Vector3& i, const default_type l, const default_type f) const { Base::add (i, l); VoxelAddon::operator+= (f); }
+            void add (const Eigen::Vector3d&, const default_type) const { assert (0); }
+            void add (const Eigen::Vector3d& i, const default_type l, const default_type f) const { Base::add (i, l); VoxelAddon::operator+= (f); }
             void normalize() const { VoxelAddon::normalize (get_length()); Base::normalize(); }
 
           };
@@ -189,7 +191,7 @@ namespace MR {
 
               using VoxType = VoxelDEC;
 
-              inline void insert (const Eigen::Vector3i& v, const Eigen::Vector3& d, const default_type l, const default_type f)
+              inline void insert (const Eigen::Vector3i& v, const Eigen::Vector3d& d, const default_type l, const default_type f)
               {
                 const VoxelDEC temp (v, d, l, f);
                 iterator existing = std::set<VoxelDEC>::find (temp);

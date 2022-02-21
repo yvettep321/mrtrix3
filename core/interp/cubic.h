@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __interp_cubic_h__
 #define __interp_cubic_h__
@@ -78,7 +80,7 @@ namespace MR
 
       protected:
         SplineType H[3];
-        Eigen::Vector3 P;
+        Eigen::Vector3d P;
 
         ssize_t clamp (ssize_t x, ssize_t dim) const {
           if (x < 0) return 0;
@@ -118,7 +120,7 @@ namespace MR
         /*! See file interp/base.h for details. */
         template <class VectorType>
         bool voxel (const VectorType& pos) {
-          Eigen::Vector3 f = Base<ImageType>::intravoxel_offset (pos);
+          Eigen::Vector3d f = Base<ImageType>::intravoxel_offset (pos);
           if (Base<ImageType>::out_of_bounds)
             return false;
           P = pos;
@@ -242,7 +244,7 @@ namespace MR
         /*! See file interp/base.h for details. */
         template <class VectorType>
         bool voxel (const VectorType& pos) {
-          Eigen::Vector3 f = Base<ImageType>::intravoxel_offset (pos);
+          Eigen::Vector3d f = Base<ImageType>::intravoxel_offset (pos);
           if (Base<ImageType>::out_of_bounds)
             return false;
           P = pos;
@@ -403,7 +405,7 @@ namespace MR
         /*! See file interp/base.h for details. */
         template <class VectorType>
         bool voxel (const VectorType& pos) {
-          Eigen::Vector3 f = Base<ImageType>::intravoxel_offset (pos);
+          Eigen::Vector3d f = Base<ImageType>::intravoxel_offset (pos);
           if (Base<ImageType>::out_of_bounds)
             return false;
           P = pos;

@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "surface/mesh.h"
 
@@ -243,7 +245,11 @@ namespace MR
       //   number of vertices, it may be saved in big-endian format, so try flipping everything
       // Actually, should pop up at the first polygon read: number of points in polygon won't be 3 or 4
 
-      verify_data();
+      try {
+        verify_data();
+      } catch(Exception& e) {
+        throw Exception (e, "Error verifying surface data from VTK file \"" + path + "\"");
+      }
     }
 
 
@@ -287,10 +293,10 @@ namespace MR
             warn_attribute = true;
 
           triangles.push_back ( vector<uint32_t> { uint32_t(vertices.size()-3), uint32_t(vertices.size()-2), uint32_t(vertices.size()-1) } );
-          const Eigen::Vector3 computed_normal = Surface::normal (*this, triangles.back());
+          const Eigen::Vector3d computed_normal = Surface::normal (*this, triangles.back());
           if (computed_normal.dot (normal.cast<default_type>()) < 0.0)
             warn_right_hand_rule = true;
-          if (std::abs (computed_normal.dot (normal.cast<default_type>())) < 0.99)
+          if (abs (computed_normal.dot (normal.cast<default_type>())) < 0.99)
             warn_nonstandard_normals = true;
         }
         if (triangles.size() != count)
@@ -351,10 +357,10 @@ namespace MR
               throw Exception ("Error parsing STL file " + Path::basename (path) + ": facet ended with " + str(vertex_index) + " vertices");
             triangles.push_back ( vector<uint32_t> { uint32_t(vertices.size()-3), uint32_t(vertices.size()-2), uint32_t(vertices.size()-1) } );
             vertex_index = 0;
-            const Eigen::Vector3 computed_normal = Surface::normal (*this, triangles.back());
+            const Eigen::Vector3d computed_normal = Surface::normal (*this, triangles.back());
             if (computed_normal.dot (normal) < 0.0)
               warn_right_hand_rule = true;
-            if (std::abs (computed_normal.dot (normal)) < 0.99)
+            if (abs (computed_normal.dot (normal)) < 0.99)
               warn_nonstandard_normals = true;
           } else if (line.substr(0, 8) == "endsolid") {
             if (inside_facet)
@@ -381,7 +387,11 @@ namespace MR
       if (warn_nonstandard_normals)
         WARN ("File " + Path::basename (path) + " contains non-standard normals, which will be ignored");
 
-      verify_data();
+      try {
+        verify_data();
+      } catch(Exception& e) {
+        throw Exception (e, "Error verifying surface data from STL file \"" + path + "\"");
+      }
     }
 
 
@@ -493,7 +503,11 @@ namespace MR
       if (object.size())
         name = object;
 
-      verify_data();
+      try {
+        verify_data();
+      } catch(Exception& e) {
+        throw Exception (e, "Error verifying surface data from OBJ file \"" + path + "\"");
+      }
     }
 
 
@@ -508,31 +522,71 @@ namespace MR
 
       if (magic_number == FreeSurfer::triangle_file_magic_number) {
 
-        char c;
-        for (size_t i = 0; i != 2; ++i) {
-          do {
-            in.read (&c, 1);
-          } while (c != '\n');
+        std::string comment;
+        std::getline (in, comment);
+        const auto first_newline_offset = in.tellg();
+
+        // Some FreeSurfer files will have a second comment line; others will not
+        // Need to make honest attempt at both possible scenarios
+        auto load_triangles = [&] () {
+          const int32_t num_vertices = FreeSurfer::get_BE<int32_t> (in);
+          if (num_vertices <= 0)
+            throw Exception ("Error reading FreeSurfer file: Non-positive vertex count (" + str(num_vertices) + ")");
+          const int32_t num_polygons = FreeSurfer::get_BE<int32_t> (in);
+          if (num_polygons <= 0)
+            throw Exception ("Error reading FreeSurfer file: Non-positive polygon count (" + str(num_polygons) + ")");
+          if (num_polygons > 3*num_vertices)
+            throw Exception ("Error reading FreeSurfer file: More polygons (" + str(num_polygons) + ") than triple the number of vertices (" + str(num_vertices) + ")");
+          if (num_polygons < num_vertices / 3)
+            throw Exception ("Error reading FreeSurfer file: Not enough polygons (" + str(num_polygons) + ") to use all vertices (" + str(num_vertices) + ")");
+          try {
+            vertices.reserve (num_vertices);
+            triangles.reserve (num_polygons);
+          } catch (std::bad_alloc&) {
+            vertices.shrink_to_fit();
+            triangles.shrink_to_fit();
+            throw Exception ("Error reading FreeSurfer file: Memory allocation ("
+                             + str(num_vertices) + " vertices, " + str(num_polygons) + " polygons = erroneous?)");
+          }
+          for (int32_t i = 0; i != num_vertices; ++i) {
+            std::array<float, 3> temp;
+            for (size_t axis = 0; axis != 3; ++axis)
+              temp[axis] = FreeSurfer::get_BE<float> (in);
+            if (!in.good())
+              throw Exception ("Error reading FreeSurfer file: EOF reached after " + str(vertices.size()) + " of " + str(num_vertices) + " vertices");
+            vertices.push_back (Vertex (temp[0], temp[1], temp[2]));
+          }
+          for (int32_t i = 0; i != num_polygons; ++i) {
+            std::array<int32_t, 3> temp;
+            for (size_t v = 0; v != 3; ++v)
+              temp[v] = FreeSurfer::get_BE<int32_t> (in);
+            if (!in.good())
+              throw Exception ("Error reading FreeSurfer file: EOF reached after " + str(triangles.size()) + " of " + str(num_polygons) + " triangles");
+            triangles.push_back (Triangle (temp));
+          }
+        };
+
+        try {
+          load_triangles();
+        } catch (Exception& e_onecomment) {
+          vertices.clear();
+          triangles.clear();
+          in.clear();
+          in.seekg (first_newline_offset, std::ios_base::beg);
+          std::string second_comment;
+          std::getline (in, second_comment);
+          try {
+            load_triangles();
+          } catch (Exception& e_twocomments) {
+            Exception e ("Unable to read FreeSurfer file \"" + path + "\"");
+            e.push_back ("Error if file header is one-line comment:");
+            e.push_back (e_onecomment);
+            e.push_back ("Error if file header is two-line comment:");
+            e.push_back (e_twocomments);
+            e.display();
+            throw e;
+          }
         }
-        const int32_t num_vertices = FreeSurfer::get_BE<int32_t> (in);
-        const int32_t num_polygons = FreeSurfer::get_BE<int32_t> (in);
-        vertices.reserve (num_vertices);
-        for (int32_t i = 0; i != num_vertices; ++i) {
-          float temp[3];
-          for (size_t axis = 0; axis != 3; ++axis)
-            temp[axis] = FreeSurfer::get_BE<float> (in);
-          vertices.push_back (Vertex (temp[0], temp[1], temp[2]));
-        }
-        if (!in.good())
-          throw Exception ("Error reading FreeSurfer file: EOF reached");
-        for (int32_t i = 0; i != num_polygons; ++i) {
-          std::array<int32_t, 3> temp;
-          for (size_t v = 0; v != 3; ++v)
-            temp[v] = FreeSurfer::get_BE<int32_t> (in);
-          triangles.push_back (Triangle (temp));
-        }
-        if (!in.good())
-          throw Exception ("Error reading FreeSurfer file: EOF reached");
 
       } else if (magic_number == FreeSurfer::quad_file_magic_number) {
 
@@ -556,7 +610,11 @@ namespace MR
         throw Exception ("File " + Path::basename (path) + " is not a FreeSurfer surface file");
       }
 
-      verify_data();
+      try {
+        verify_data();
+      } catch(Exception& e) {
+        throw Exception (e, "Error verifying surface data from FreeSurfer file \"" + path + "\"");
+      }
     }
 
 
@@ -656,13 +714,13 @@ namespace MR
         File::OFStream out (path, std::ios_base::binary | std::ios_base::out);
         const std::string string = std::string ("mrtrix_version: ") + App::mrtrix_version;
         char header[80];
-        strncpy (header, string.c_str(), 80);
+        strncpy (header, string.c_str(), 79);
         out.write (header, 80);
         const uint32_t count = triangles.size();
         out.write (reinterpret_cast<const char*>(&count), sizeof(uint32_t));
         const uint16_t attribute_byte_count = 0;
         for (TriangleList::const_iterator i = triangles.begin(); i != triangles.end(); ++i) {
-          const Eigen::Vector3 n (normal (*this, *i));
+          const Eigen::Vector3d n (normal (*this, *i));
           const float n_temp[3] { float(n[0]), float(n[1]), float(n[2]) };
           out.write (reinterpret_cast<const char*>(&n_temp[0]), 3 * sizeof(float));
           for (size_t v = 0; v != 3; ++v) {
@@ -679,7 +737,7 @@ namespace MR
         File::OFStream out (path);
         out << "solid \n";
         for (TriangleList::const_iterator i = triangles.begin(); i != triangles.end(); ++i) {
-          const Eigen::Vector3 n (normal (*this, *i));
+          const Eigen::Vector3d n (normal (*this, *i));
           out << "facet normal " << str (n[0]) << " " << str (n[1]) << " " << str (n[2]) << "\n";
           out << "    outer loop\n";
           for (size_t v = 0; v != 3; ++v) {
@@ -700,7 +758,7 @@ namespace MR
     void Mesh::save_obj (const std::string& path) const
     {
       File::OFStream out (path);
-      out << "# mrtrix_version: " << App::mrtrix_version << "\n";
+      out << "# " << App::command_history_string << "\n";
       out << "o " << name << "\n";
       for (VertexList::const_iterator v = vertices.begin(); v != vertices.end(); ++v)
         out << "v " << str((*v)[0]) << " " << str((*v)[1]) << " " << str((*v)[2]) << " 1.0\n";
@@ -749,5 +807,3 @@ namespace MR
 
   }
 }
-
-

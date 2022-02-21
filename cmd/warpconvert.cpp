@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "command.h"
 #include "image.h"
@@ -18,12 +20,13 @@
 #include "registration/warp/compose.h"
 #include "registration/warp/convert.h"
 #include "adapter/extract.h"
+#include "file/nifti_utils.h"
 
 
 using namespace MR;
 using namespace App;
 
-const char* conversion_type[] = {"deformation2displacement","displacement2deformation","warpfull2deformation","warpfull2displacement",NULL};
+const char* conversion_types[] = {"deformation2displacement","displacement2deformation","warpfull2deformation","warpfull2displacement",nullptr};
 
 
 void usage ()
@@ -40,13 +43,10 @@ void usage ()
 
   ARGUMENTS
   + Argument ("in", "the input warp image.").type_image_in ()
+  + Argument ("type", "the conversion type required. Valid choices are: " + join(conversion_types, ", ")).type_choice (conversion_types)
   + Argument ("out", "the output warp image.").type_image_out ();
 
   OPTIONS
-  + Option ("type", "the conversion type required. Valid choices are: "
-                    "deformation2displacement, displacement2deformation, warpfull2deformation, warpfull2displacement (Default: deformation2displacement)")
-  + Argument ("choice").type_choice (conversion_type)
-
   + Option ("template", "define a template image when converting a warpfull file (which is defined on a grid in the midway space between image 1 & 2). For example to "
                         "generate the deformation field that maps image1 to image2, then supply image2 as the template image")
   + Argument ("image").type_image_in ()
@@ -65,6 +65,7 @@ void usage ()
 
 void run ()
 {
+  const int type = argument[1];
   bool midway_space = get_options("midway_space").size() ? true : false;
 
   std::string template_filename;
@@ -77,13 +78,8 @@ void run ()
   if (opt.size())
     from = opt[0][0];
 
-  int registration_type = 0;
-  opt = get_options ("type");
-  if (opt.size())
-    registration_type = opt[0][0];
-
   // deformation2displacement
-  if (registration_type == 0) {
+  if (type == 0) {
     if (midway_space)
       WARN ("-midway_space option ignored with deformation2displacement conversion type");
     if (get_options ("template").size())
@@ -96,11 +92,11 @@ void run ()
 
     Header header (deformation);
     header.datatype() = DataType::from_command_line (DataType::Float32);
-    Image<default_type> displacement = Image<default_type>::create (argument[1], header).with_direct_io();
+    Image<default_type> displacement = Image<default_type>::create (argument[2], header).with_direct_io();
     Registration::Warp::deformation2displacement (deformation, displacement);
 
   // displacement2deformation
-  } else if (registration_type == 1) {
+  } else if (type == 1) {
     auto displacement = Image<default_type>::open (argument[0]).with_direct_io (3);
     Registration::Warp::check_warp (displacement);
 
@@ -113,12 +109,16 @@ void run ()
 
     Header header (displacement);
     header.datatype() = DataType::from_command_line (DataType::Float32);
-    Image<default_type> deformation = Image<default_type>::create (argument[1], header).with_direct_io();
+    Image<default_type> deformation = Image<default_type>::create (argument[2], header).with_direct_io();
     Registration::Warp::displacement2deformation (displacement, deformation);
 
    // warpfull2deformation & warpfull2displacement
-  } else if (registration_type == 2 || registration_type == 3) {
-
+  } else if (type == 2 || type == 3) {
+    if (!Path::is_mrtrix_image (argument[0]) && !(Path::has_suffix (argument[0], {".nii", ".nii.gz"}) &&
+                                                  File::Config::get_bool ("NIfTIAutoLoadJSON", false) &&
+                                                  Path::exists(File::NIfTI::get_json_path(opt[0][0]))))
+      WARN ("warp_full image is not in original .mif/.mih file format or in NIfTI file format with associated JSON.  "
+            "Converting to other file formats may remove linear transformations stored in the image header.");
     auto warp = Image<default_type>::open (argument[0]).with_direct_io (3);
     Registration::Warp::check_warp_full (warp);
 
@@ -132,13 +132,16 @@ void run ()
       warp_output = Registration::Warp::compute_full_deformation (warp, template_header, from);
     }
 
-    if (registration_type == 3)
+    if (type == 3)
       Registration::Warp::deformation2displacement (warp_output, warp_output);
 
     Header header (warp_output);
     header.datatype() = DataType::from_command_line (DataType::Float32);
-    Image<default_type> output = Image<default_type>::create (argument[1], header);
+    Image<default_type> output = Image<default_type>::create (argument[2], header);
     threaded_copy_with_progress_message ("converting warp", warp_output, output);
+
+  } else {
+    throw Exception ("Unsupported warp conversion type");
   }
 
 }

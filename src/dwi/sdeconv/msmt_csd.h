@@ -1,32 +1,36 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_sdeconv_msmt_csd_h__
 #define __dwi_sdeconv_msmt_csd_h__
 
 #include "header.h"
 #include "types.h"
-
+#include "dwi/gradient.h"
+#include "dwi/shells.h"
 #include "math/constrained_least_squares.h"
 #include "math/math.h"
 #include "math/SH.h"
 #include "math/ZSH.h"
 
 #include "dwi/directions/predefined.h"
-#include "dwi/gradient.h"
-#include "dwi/shells.h"
 
+#define DEFAULT_MSMTCSD_LMAX 8
+#define DEFAULT_MSMTCSD_NORM_LAMBDA 1.0e-10
+#define DEFAULT_MSMTCSD_NEG_LAMBDA 1.0e-10
 
 namespace MR
 {
@@ -35,7 +39,7 @@ namespace MR
     namespace SDeconv
     {
 
-
+      extern const App::OptionGroup MSMT_CSD_options;
 
       class MSMT_CSD { MEMALIGN(MSMT_CSD)
         public:
@@ -43,9 +47,11 @@ namespace MR
           class Shared { MEMALIGN(Shared)
             public:
               Shared (const Header& dwi_header) :
-                  grad (DWI::get_valid_DW_scheme (dwi_header)),
+                  grad (DWI::get_DW_scheme (dwi_header)),
                   shells (grad),
-                  HR_dirs (DWI::Directions::electrostatic_repulsion_300()) { shells.select_shells(false,false,false); }
+                  HR_dirs (DWI::Directions::electrostatic_repulsion_300()),
+                  solution_min_norm_regularisation (DEFAULT_MSMTCSD_NORM_LAMBDA),
+                  constraint_min_norm_regularisation (DEFAULT_MSMTCSD_NEG_LAMBDA) { shells.select_shells(false,false,false); }
 
 
               void parse_cmdline_options()
@@ -53,10 +59,16 @@ namespace MR
                 using namespace App;
                 auto opt = get_options ("lmax");
                 if (opt.size())
-                  lmax = parse_ints (opt[0][0]);
+                  lmax = parse_ints<uint32_t> (opt[0][0]);
                 opt = get_options ("directions");
                 if (opt.size())
                   HR_dirs = load_matrix (opt[0][0]);
+                opt = get_options ("norm_lambda");
+                if (opt.size())
+                  solution_min_norm_regularisation = opt[0][0];
+                opt = get_options ("neg_lambda");
+                if (opt.size())
+                  constraint_min_norm_regularisation = opt[0][0];
               }
 
 
@@ -64,7 +76,7 @@ namespace MR
               void set_responses (const vector<std::string>& files)
               {
                 lmax_response.clear();
-                for (const auto s : files) {
+                for (const auto& s : files) {
                   Eigen::MatrixXd r;
                   try {
                     r = load_matrix (s);
@@ -74,6 +86,7 @@ namespace MR
                   responses.push_back (std::move (r));
                 }
                 prepare_responses();
+                response_files = files;
               }
 
               void set_responses (const vector<Eigen::MatrixXd>& matrices)
@@ -89,20 +102,21 @@ namespace MR
                 if (lmax.empty()) {
                   lmax = lmax_response;
                   for (size_t t = 0; t != num_tissues(); ++t) {
-                    lmax[t] = std::min (8, lmax[t]);
+                    lmax[t] = std::min (uint32_t(DEFAULT_MSMTCSD_LMAX), lmax[t]);
                   }
                 } else {
                   if (lmax.size() != num_tissues())
-                    throw Exception ("Number of lmaxes specified does not match number of tissues");
+                    throw Exception ("Number of lmaxes specified (" + str(lmax.size()) + ") does not match number of tissues (" + str(num_tissues()) + ")");
                   for (const auto i : lmax) {
-                    if (i < 0 || i % 2)
+                    if (i % 2)
                       throw Exception ("Each value of lmax must be a non-negative even integer");
                   }
                 }
 
                 for (size_t t = 0; t != num_tissues(); ++t) {
                   if (size_t(responses[t].rows()) != num_shells())
-                    throw Exception ("number of rows in response function must match number of b-value shells");
+                    throw Exception ("number of rows in response functions must match number of b-value shells; "
+                                     "number of shells is " + str(num_shells()) + ", but file \"" + response_files[t] + "\" contains " + str(responses[t].rows()) + " rows");
                   // Pad response functions out to the requested lmax for this tissue
                   responses[t].conservativeResizeLike (Eigen::MatrixXd::Zero (num_shells(), Math::ZSH::NforL (lmax[t])));
                 }
@@ -112,7 +126,7 @@ namespace MR
                 //////////////////////////////////////////////////
 
                 size_t nparams = 0;
-                int maxlmax = 0;
+                uint32_t maxlmax = 0;
                 for (size_t i = 0; i < num_tissues(); i++) {
                   nparams += Math::SH::NforL (lmax[i]);
                   maxlmax = std::max (maxlmax, lmax[i]);
@@ -120,7 +134,7 @@ namespace MR
 
                 INFO ("initialising multi-tissue CSD for " + str(num_tissues()) + " tissue types, with " + str (nparams) + " parameters");
 
-                Eigen::MatrixXd C (grad.rows(), nparams);
+                Eigen::MatrixXd C = Eigen::MatrixXd::Zero (grad.rows(), nparams);
 
                 vector<size_t> dwilist;
                 for (size_t i = 0; i != size_t(grad.rows()); i++)
@@ -197,8 +211,8 @@ namespace MR
                   b_m += m[i];
                   b_n += n[i];
                 }
-
-                problem = Math::ICLS::Problem<double> (C, A, 1.0e-10, 1.0e-10);
+                problem = Math::ICLS::Problem<double> (C, A, Eigen::VectorXd(), 0,
+                  solution_min_norm_regularisation, constraint_min_norm_regularisation);
 
                 INFO ("Multi-shell, multi-tissue CSD initialised successfully");
               }
@@ -211,9 +225,11 @@ namespace MR
               const Eigen::MatrixXd grad;
               DWI::Shells shells;
               Eigen::MatrixXd HR_dirs;
-              vector<int> lmax, lmax_response;
+              vector<uint32_t> lmax, lmax_response;
               vector<Eigen::MatrixXd> responses;
+              vector<std::string> response_files;
               Math::ICLS::Problem<double> problem;
+              double solution_min_norm_regularisation, constraint_min_norm_regularisation;
 
 
             private:

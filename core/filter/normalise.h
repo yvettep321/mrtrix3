@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __image_filter_normalise3D_h__
 #define __image_filter_normalise3D_h__
@@ -51,33 +53,31 @@ namespace MR
         template <class HeaderType>
           Normalise (const HeaderType& in, const std::string& message) :
             Base (in, message),
-            extent (1,3) { 
+            extent (1,3) {
               datatype() = DataType::Float32;
             }
 
         template <class HeaderType>
-        Normalise (const HeaderType& in, const vector<int>& extent) :
+        Normalise (const HeaderType& in, const vector<uint32_t>& extent) :
             Base (in),
             extent (extent) {
           datatype() = DataType::Float32;
         }
 
         template <class HeaderType>
-          Normalise (const HeaderType& in, const std::string& message, const vector<int>& extent) :
+          Normalise (const HeaderType& in, const std::string& message, const vector<uint32_t>& extent) :
             Base (in, message),
-            extent (extent) { 
+            extent (extent) {
               datatype() = DataType::Float32;
             }
 
         //! Set the extent of normalise filtering neighbourhood in voxels.
         //! This must be set as a single value for all three dimensions
         //! or three values, one for each dimension. Default 3x3x3.
-        void set_extent (const vector<int>& ext) {
+        void set_extent (const vector<uint32_t>& ext) {
           for (size_t i = 0; i < ext.size(); ++i) {
-            if (!(ext[i] & int (1)))
+            if (!(ext[i] & uint32_t(1)))
               throw Exception ("expected odd number for extent");
-            if (ext[i] < 0)
-              throw Exception ("the kernel extent must be positive");
           }
           extent = ext;
         }
@@ -92,7 +92,7 @@ namespace MR
         }
 
     protected:
-        vector<int> extent;
+        vector<uint32_t> extent;
     };
     //! @}
   }

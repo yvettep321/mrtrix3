@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __surface_algo_image2mesh_h__
 #define __surface_algo_image2mesh_h__
@@ -120,7 +122,7 @@ namespace MR
                     const auto existing = vox2vertindex.find (voxels[in_vertex]);
                     if (existing == vox2vertindex.end()) {
                       triangle_vertices[out_vertex] = vertices.size();
-                      Eigen::Vector3 pos_voxelspace (default_type(voxels[in_vertex][0]) - 0.5, default_type(voxels[in_vertex][1]) - 0.5, default_type(voxels[in_vertex][2]) - 0.5);
+                      Eigen::Vector3d pos_voxelspace (default_type(voxels[in_vertex][0]) - 0.5, default_type(voxels[in_vertex][1]) - 0.5, default_type(voxels[in_vertex][2]) - 0.5);
                       vertices.push_back (transform.voxel2scanner * pos_voxelspace);
                     } else {
                       triangle_vertices[out_vertex] = existing->second;

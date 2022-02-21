@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __gui_dwi_renderer_h__
 #define __gui_dwi_renderer_h__
@@ -32,9 +34,10 @@ namespace MR
 
     class Projection;
 
-    namespace GL 
+    namespace GL
     {
       class Lighting;
+      class mat4;
     }
 
     namespace DWI
@@ -65,8 +68,8 @@ namespace MR
             mode = i;
           }
 
-          void start (const Projection& projection, const GL::Lighting& lighting, float scale, 
-              bool use_lighting, bool color_by_direction, bool hide_neg_lobes, bool orthographic = false);
+          void start (const Projection& projection, const GL::Lighting& lighting, float scale,
+              bool use_lighting, bool color_by_direction, bool hide_neg_lobes, bool orthographic = false, const GL::mat4* colour_relative_to_projection = nullptr);
 
           void draw (const Eigen::Vector3f& origin, int buffer_ID = 0) const {
             (void) buffer_ID; // to silence unused-parameter warnings
@@ -97,13 +100,13 @@ namespace MR
           float object_color[3];
           mutable GLuint reverse_ID, origin_ID;
 
-          class Shader : public GL::Shader::Program { MEMALIGN(Shader)
+          class Shader : public GL::Shader::Program { NOMEMALIGN
             public:
               Shader () : mode_ (mode_t::SH), use_lighting_ (true), colour_by_direction_ (true), hide_neg_values_ (true), orthographic_ (false) { }
-              void start (mode_t mode, bool use_lighting, bool colour_by_direction, bool hide_neg_values, bool orthographic);
+              void start (mode_t mode, bool use_lighting, bool colour_by_direction, bool hide_neg_values, bool orthographic, bool colour_relative_to_projection);
             protected:
               mode_t mode_;
-              bool use_lighting_, colour_by_direction_, hide_neg_values_, orthographic_;
+              bool use_lighting_, colour_by_direction_, hide_neg_values_, orthographic_, colour_relative_to_projection_;
               std::string vertex_shader_source() const;
               std::string geometry_shader_source() const;
               std::string fragment_shader_source() const;
@@ -226,12 +229,6 @@ namespace MR
           } dixel;
 
         private:
-          class GrabContext : public Context::Grab
-          { NOMEMALIGN
-            public:
-              GrabContext (QGLWidget* context) :
-                  Context::Grab (context) { }
-          };
           QGLWidget* context_;
 
 

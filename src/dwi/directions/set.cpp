@@ -1,23 +1,25 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "dwi/directions/set.h"
 
 #include <list>
 #include <set>
 
-#include "bitset.h"
+#include "misc/bitset.h"
 #include "math/rng.h"
 
 
@@ -101,7 +103,7 @@ namespace MR {
             Vertex (const Set& set, const index_type index, const bool inverse) :
                 dir (set[index] * (inverse ? -1.0 : 1.0)),
                 index (index) { }
-            const Eigen::Vector3 dir;
+            const Eigen::Vector3d dir;
             const index_type index; // Indexes the underlying direction set
         };
 
@@ -113,7 +115,7 @@ namespace MR {
                 dist (std::max ( { vertices[one].dir.dot (normal), vertices[two].dir.dot (normal), vertices[three].dir.dot (normal) } ) ) { }
             bool includes (const index_type i) const { return (indices[0] == i || indices[1] == i || indices[2] == i); }
             const std::array<index_type,3> indices; // Indexes the vertices vector
-            const Eigen::Vector3 normal;
+            const Eigen::Vector3d normal;
             const default_type dist;
         };
 
@@ -325,16 +327,16 @@ namespace MR {
 
 
 
-      index_type FastLookupSet::select_direction (const Eigen::Vector3& p) const
+      index_type FastLookupSet::select_direction (const Eigen::Vector3d& p) const
       {
 
         const size_t grid_index = dir2gridindex (p);
 
         index_type best_dir = grid_lookup[grid_index].front();
-        default_type max_dp = std::abs (p.dot (get_dir (best_dir)));
+        default_type max_dp = abs (p.dot (get_dir (best_dir)));
         for (size_t i = 1; i != grid_lookup[grid_index].size(); ++i) {
           const index_type this_dir = (grid_lookup[grid_index])[i];
-          const default_type this_dp = std::abs (p.dot (get_dir (this_dir)));
+          const default_type this_dp = abs (p.dot (get_dir (this_dir)));
           if (this_dp > max_dp) {
             max_dp = this_dp;
             best_dir = this_dir;
@@ -347,13 +349,13 @@ namespace MR {
 
 
 
-      index_type FastLookupSet::select_direction_slow (const Eigen::Vector3& p) const
+      index_type FastLookupSet::select_direction_slow (const Eigen::Vector3d& p) const
       {
 
         index_type dir = 0;
-        default_type max_dot_product = std::abs (p.dot (unit_vectors[0]));
+        default_type max_dot_product = abs (p.dot (unit_vectors[0]));
         for (size_t i = 1; i != size(); ++i) {
-          const default_type this_dot_product = std::abs (p.dot (unit_vectors[i]));
+          const default_type this_dot_product = abs (p.dot (unit_vectors[i]));
           if (this_dot_product > max_dot_product) {
             max_dot_product = this_dot_product;
             dir = i;
@@ -374,7 +376,7 @@ namespace MR {
         for (size_t i = 0; i != size(); ++i) {
           for (vector<index_type>::const_iterator j = adj_dirs[i].begin(); j != adj_dirs[i].end(); ++j) {
             if (*j > i) {
-              adj_dot_product_sum += std::abs (unit_vectors[i].dot (unit_vectors[*j]));
+              adj_dot_product_sum += abs (unit_vectors[i].dot (unit_vectors[*j]));
               ++adj_dot_product_count;
             }
           }
@@ -415,7 +417,7 @@ namespace MR {
               case 3: el += el_grid_step; break;
             }
 
-            const Eigen::Vector3 p (cos(az) * sin(el), sin(az) * sin(el), cos (el));
+            const Eigen::Vector3d p (cos(az) * sin(el), sin(az) * sin(el), cos (el));
             const index_type nearest_dir = select_direction_slow (p);
             bool dir_present = false;
             for (vector<index_type>::const_iterator d = grid_lookup[i].begin(); !dir_present && d != grid_lookup[i].end(); ++d)
@@ -451,7 +453,7 @@ namespace MR {
 
 
 
-      size_t FastLookupSet::dir2gridindex (const Eigen::Vector3& p) const
+      size_t FastLookupSet::dir2gridindex (const Eigen::Vector3d& p) const
       {
 
         const default_type azimuth   = atan2(p[1], p[0]);
@@ -475,7 +477,7 @@ namespace MR {
         size_t error_count = 0;
         const size_t checks = 1000000;
         for (size_t i = 0; i != checks; ++i) {
-          Eigen::Vector3 p (normal(rng), normal(rng), normal(rng));
+          Eigen::Vector3d p (normal(rng), normal(rng), normal(rng));
           p.normalize();
           if (select_direction (p) != select_direction_slow (p))
             ++error_count;

@@ -1,30 +1,32 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_tractography_algorithms_iFOD2_h__
 #define __dwi_tractography_algorithms_iFOD2_h__
 
 #include <algorithm>
 
+#include "types.h"
 #include "math/SH.h"
+#include "dwi/tractography/properties.h"
 #include "dwi/tractography/tracking/method.h"
 #include "dwi/tractography/tracking/shared.h"
 #include "dwi/tractography/tracking/tractography.h"
 #include "dwi/tractography/tracking/types.h"
 #include "dwi/tractography/algorithms/calibrator.h"
-
-
 
 
 namespace MR
@@ -36,6 +38,9 @@ namespace MR
       namespace Algorithms
       {
 
+        extern const App::OptionGroup iFOD2Options;
+        void load_iFOD2_options (Tractography::Properties&);
+
         using namespace MR::DWI::Tractography::Tracking;
 
         class iFOD2 : public MethodBase { MEMALIGN(iFOD2)
@@ -44,60 +49,61 @@ namespace MR
             class Shared : public SharedBase { MEMALIGN(Shared)
               public:
                 Shared (const std::string& diff_path, DWI::Tractography::Properties& property_set) :
-                  SharedBase (diff_path, property_set),
-                  lmax (Math::SH::LforN (source.size(3))),
-                  num_samples (TCKGEN_DEFAULT_IFOD2_NSAMPLES),
-                  max_trials (TCKGEN_DEFAULT_MAX_TRIALS_PER_STEP),
-                  sin_max_angle (std::sin (max_angle)),
-                  mean_samples (0.0),
-                  mean_truncations (0.0),
-                  max_max_truncation (0.0),
-                  num_proc (0)
-              {
-                try {
-                  Math::SH::check (source);
-                } catch (Exception& e) {
-                  e.display();
-                  throw Exception ("Algorithm iFOD2 expects as input a spherical harmonic (SH) image");
+                    SharedBase (diff_path, property_set),
+                    lmax (Math::SH::LforN (source.size(3))),
+                    num_samples (Defaults::ifod2_nsamples),
+                    max_trials (Defaults::max_trials_per_step),
+                    sin_max_angle_ho (NaN),
+                    mean_samples (0.0),
+                    mean_truncations (0.0),
+                    max_max_truncation (0.0),
+                    num_proc (0)
+                {
+                  try {
+                    Math::SH::check (source);
+                  } catch (Exception& e) {
+                    e.display();
+                    throw Exception ("Algorithm iFOD2 expects as input a spherical harmonic (SH) image");
+                  }
+
+                  if (rk4)
+                    throw Exception ("4th-order Runge-Kutta integration not valid for iFOD2 algorithm");
+
+                  set_step_and_angle (Defaults::stepsize_voxels_ifod2, Defaults::angle_ifod2, true);
+                  sin_max_angle_ho = std::sin (max_angle_ho);
+                  set_cutoff (Defaults::cutoff_fod * (is_act() ? Defaults::cutoff_act_multiplier : 1.0));
+
+                  properties["method"] = "iFOD2";
+                  properties.set (lmax, "lmax");
+                  properties.set (num_samples, "samples_per_step");
+                  properties.set (max_trials, "max_trials");
+                  fod_power = 1.0/num_samples;
+                  properties.set (fod_power, "fod_power");
+                  bool precomputed = true;
+                  properties.set (precomputed, "sh_precomputed");
+                  if (precomputed)
+                    precomputer.init (lmax);
+
+                  // num_samples is number of samples excluding first point
+                  --num_samples;
+                  INFO ("iFOD2 generating " + str(num_samples) + " vertices per " + str (step_size) + " mm step");
+
+                  // iFOD2 by default downsamples after track propagation back to the desired 'step size'
+                  //   i.e. the sub-step detail is removed from the output
+                  size_t downsample_factor = num_samples;
+                  properties.set (downsample_factor, "downsample_factor");
+                  downsampler.set_ratio (downsample_factor);
+
+                  // For iFOD2, "step_size" represents the length of the chord represented
+                  //   using "num_samples" vertices rather than just one; the following two
+                  //   variables need to be calculated accordingly:
+                  //   - The arc angle subtended by two sequential vertices on a circle of minimal radius
+                  //     (prior to downsampling)
+                  const float angle_minradius_preds = 2.0 * std::asin (step_size / (2.0 * min_radius)) / float(num_samples);
+                  //   - The maximal possible distance between vertices after downsampling
+                  const float max_step_postds = downsample_factor * step_size / float(num_samples);
+                  set_num_points (angle_minradius_preds, max_step_postds);
                 }
-
-                if (rk4)
-                  throw Exception ("4th-order Runge-Kutta integration not valid for iFOD2 algorithm");
-
-                set_step_size (0.5);
-                INFO ("minimum radius of curvature = " + str(step_size / (max_angle / Math::pi_2)) + " mm");
-
-                properties["method"] = "iFOD2";
-                properties.set (lmax, "lmax");
-                properties.set (num_samples, "samples_per_step");
-                properties.set (max_trials, "max_trials");
-                fod_power = 1.0/num_samples;
-                properties.set (fod_power, "fod_power");
-                bool precomputed = true;
-                properties.set (precomputed, "sh_precomputed");
-                if (precomputed)
-                  precomputer.init (lmax);
-
-                // num_samples is number of samples excluding first point
-                --num_samples;
-
-                INFO ("iFOD2 internal step size = " + str (internal_step_size()) + " mm");
-
-                // Have to modify length criteria, as they are enforced in points, not mm
-                const float min_dist = to<float> (properties["min_dist"]);
-                min_num_points = std::max (2, Math::round<int> (min_dist/internal_step_size()) + 1);
-                const float max_dist = to<float> (properties["max_dist"]);
-                max_num_points = round (max_dist/internal_step_size()) + 1;
-
-                // iFOD2 by default downsamples after track propagation back to the desired 'step size'
-                //   i.e. the sub-step detail is removed from the output
-                size_t downsample_ratio = num_samples;
-                properties.set (downsample_ratio, "downsample_factor");
-                downsampler.set_ratio (downsample_ratio);
-
-                properties["output_step_size"] = str (step_size * downsample_ratio / float(num_samples));
-
-              }
 
                 ~Shared ()
                 {
@@ -124,7 +130,7 @@ namespace MR
                 float internal_step_size() const override { return step_size / float(num_samples); }
 
                 size_t lmax, num_samples, max_trials;
-                float sin_max_angle, fod_power;
+                float sin_max_angle_ho, fod_power;
                 Math::SH::PrecomputedAL<float> precomputer;
 
               private:
@@ -179,15 +185,16 @@ namespace MR
 
             ~iFOD2 ()
             {
-              S.update_stats (calibrate_list.size() + float(mean_sample_num)/float(num_sample_runs),
-                  float(num_truncations) / float(num_sample_runs),
-                  max_truncation);
+              if (num_sample_runs)
+                S.update_stats (calibrate_list.size() + float(mean_sample_num)/float(num_sample_runs),
+                    float(num_truncations) / float(num_sample_runs),
+                    max_truncation);
             }
 
 
 
 
-            bool init()
+            bool init() override
             {
               if (!get_data (source))
                 return false;
@@ -222,7 +229,7 @@ end_init:
 
 
 
-            term_t next ()
+            term_t next () override
             {
 
               if (++sample_idx < S.num_samples) {
@@ -260,7 +267,7 @@ end_init:
                     max_truncation = val/max_val;
                 }
 
-                if (uniform(*rng) < val/max_val) {
+                if (uniform(rng) < val/max_val) {
                   mean_sample_num += n;
                   half_log_prob0 = last_half_log_probN;
                   pos = positions[0];
@@ -270,13 +277,15 @@ end_init:
                 }
               }
 
-              return BAD_SIGNAL;
+              return MODEL;
             }
 
 
-            float get_metric()
+            float get_metric (const Eigen::Vector3f& position, const Eigen::Vector3f& direction) override
             {
-              return FOD (dir);
+              if (!get_data (source, position))
+                return 0.0;
+              return FOD (direction);
             }
 
 
@@ -289,7 +298,7 @@ end_init:
             }
 
 
-            void truncate_track (GeneratedTrack& tck, const size_t length_to_revert_from, const size_t revert_step)
+            void truncate_track (GeneratedTrack& tck, const size_t length_to_revert_from, const size_t revert_step) override
             {
               // OK, if we know length_to_revert_from, we can reconstruct what sample_idx was at that point
               size_t sample_idx_at_full_length = (length_to_revert_from - tck.get_seed_index()) % S.num_samples;
@@ -320,7 +329,8 @@ end_init:
               sample_idx = S.num_samples;
 
               // Need to update sgm_depth appropriately, remembering that it is tracked by exec
-              act().sgm_depth = (act().sgm_depth > points_to_remove) ? act().sgm_depth - points_to_remove : 0;
+              if (S.is_act())
+                act().sgm_depth = (act().sgm_depth > points_to_remove) ? act().sgm_depth - points_to_remove : 0;
             }
 
 
@@ -343,7 +353,7 @@ end_init:
 
 
 
-            float FOD (const Eigen::Vector3f& direction) const
+            FORCE_INLINE float FOD (const Eigen::Vector3f& direction) const
             {
               return (S.precomputer ?
                   S.precomputer.value (values, direction) :
@@ -351,7 +361,7 @@ end_init:
                   );
             }
 
-            float FOD (const Eigen::Vector3f& position, const Eigen::Vector3f& direction)
+            FORCE_INLINE float FOD (const Eigen::Vector3f& position, const Eigen::Vector3f& direction)
             {
               if (!get_data (source, position))
                 return NaN;
@@ -361,7 +371,7 @@ end_init:
 
 
 
-            float rand_path_prob ()
+            FORCE_INLINE float rand_path_prob ()
             {
               get_path (positions, tangents, rand_dir (dir));
               return path_prob (positions, tangents);
@@ -437,7 +447,7 @@ end_init:
 
 
 
-            Eigen::Vector3f rand_dir (const Eigen::Vector3f& d) { return (random_direction (d, S.max_angle, S.sin_max_angle)); }
+            FORCE_INLINE Eigen::Vector3f rand_dir (const Eigen::Vector3f& d) { return (random_direction (d, S.max_angle_ho, S.sin_max_angle_ho)); }
 
 
 

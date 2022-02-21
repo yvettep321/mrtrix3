@@ -1,21 +1,24 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include <Eigen/Geometry>
 
 #include "mrtrix.h"
 #include "file/path.h"
+#include "gui/dialog/file.h"
 #include "gui/mrview/window.h"
 #include "gui/mrview/mode/base.h"
 #include "gui/mrview/tool/screen_capture.h"
@@ -203,7 +206,7 @@ namespace MR
 
           main_box->addStretch ();
 
-          directory = new QDir();
+          current_folder = ".";
 
           connect (&window(), SIGNAL (imageChanged()), this, SLOT (on_image_changed()));
           on_image_changed();
@@ -325,7 +328,6 @@ namespace MR
 
           size_t frames_value = frames->value();
 
-          std::string folder (directory->path().toUtf8().constData());
           std::string prefix (prefix_textbox->text().toUtf8().constData());
           float radians = degrees_button->value() * (Math::pi / 180.0) / frames_value;
           size_t first_index = start_index->value();
@@ -343,13 +345,13 @@ namespace MR
               break;
 
             if (with_capture)
-              win.captureGL (Path::join (folder, prefix + printf ("%04d.png", i)));
+              win.captureGL (Path::join (current_folder, prefix + printf ("%04d.png", i)));
 
             // Rotation
-            Math::Versorf orientation (win.orientation());
+            Eigen::Quaternionf orientation (win.orientation());
             Eigen::Vector3f axis { rotation_axis_x->value(), rotation_axis_y->value(), rotation_axis_z->value() };
             axis.normalize();
-            const Math::Versorf rotation (Eigen::AngleAxisf (radians, axis));
+            const Eigen::Quaternionf rotation (Eigen::AngleAxisf (radians, axis));
 
             switch (rotation_type) {
               case RotationType::World:
@@ -374,14 +376,18 @@ namespace MR
 
             switch (translation_type) {
               case TranslationType::Voxel:
-                trans_vec = img->transform().voxel2scanner.rotation().cast<float>() * trans_vec;
+                trans_vec = img->voxel2scanner().rotation() * trans_vec;
                 break;
               case TranslationType::Camera:
               {
-                const GL::vec4 trans_gl_vec =  GL::inv (GL::mat4 (orientation)) * GL::vec4 (trans_vec[0], trans_vec[1], trans_vec[2], 1.0f);
-                trans_vec[0] = trans_gl_vec[0];
-                trans_vec[1] = trans_gl_vec[1];
-                trans_vec[2] = trans_gl_vec[2];
+                const Mode::Base* mode = window().get_current_mode();
+                if (mode) {
+                  const GL::vec4 trans_gl_vec =  mode->get_current_projection()->modelview_inverse() *
+                    GL::vec4 (trans_vec[0], trans_vec[1], trans_vec[2], 0.0f);
+                  trans_vec[0] = trans_gl_vec[0];
+                  trans_vec[1] = trans_gl_vec[1];
+                  trans_vec[2] = trans_gl_vec[2];
+                }
                 break;
               }
               case TranslationType::Scanner:
@@ -389,7 +395,6 @@ namespace MR
               default:
                 break;
             }
-
 
             Eigen::Vector3f focus_delta (trans_vec);
 
@@ -420,7 +425,7 @@ namespace MR
             start_index->setValue (i + 1);
             this->window().updateGL();
             qApp->processEvents();
-          } 
+          }
 
           is_playing = false;
         }
@@ -432,10 +437,10 @@ namespace MR
 
         void Capture::select_output_folder_slot ()
         {
-          const QString path = QFileDialog::getExistingDirectory (this, tr("Directory"), directory->path());
+          const std::string path = Dialog::File::get_folder (this, "Directory", &current_folder);
           if (!path.size()) return;
-          directory->setPath (path);
-          folder_button->setText (shorten (path.toUtf8().constData(), 20, 0).c_str());
+          folder_button->setText (qstr (shorten (current_folder, 20, 0)));
+          folder_button->setToolTip (qstr (current_folder));
           on_output_update ();
         }
 
@@ -455,8 +460,8 @@ namespace MR
 
 
 
-        void Capture::add_commandline_options (MR::App::OptionList& options) 
-        { 
+        void Capture::add_commandline_options (MR::App::OptionList& options)
+        {
           using namespace MR::App;
           options
             + OptionGroup ("Screen Capture tool options")
@@ -470,18 +475,19 @@ namespace MR
             + Option ("capture.grab", "Start the screen capture process.").allow_multiple();
         }
 
-        bool Capture::process_commandline_option (const MR::App::ParsedOption& opt) 
+        bool Capture::process_commandline_option (const MR::App::ParsedOption& opt)
         {
           if (opt.opt->is ("capture.folder")) {
-            directory->setPath (std::string(opt[0]).c_str());
-            QString path (shorten(directory->path().toUtf8().constData(), 20, 0).c_str());
-            folder_button->setText(path);
+            current_folder = std::string (opt[0]);
+            QString path (qstr (shorten(current_folder, 20, 0)));
+            folder_button->setText (path);
+            folder_button->setToolTip (qstr(current_folder));
             on_output_update ();
             return true;
           }
 
           if (opt.opt->is ("capture.prefix")) {
-            prefix_textbox->setText (std::string(opt[0]).c_str());
+            prefix_textbox->setText (qstr (opt[0]));
             on_output_update ();
             return true;
           }

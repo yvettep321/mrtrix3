@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __app_h__
 #define __app_h__
@@ -18,6 +20,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <thread>
 
 #ifdef None
 # undef None
@@ -38,18 +41,22 @@ namespace MR
 
 
     extern const char* mrtrix_version;
+    extern const char* build_date;
     extern int log_level;
+    extern int exit_error_code;
     extern std::string NAME;
+    extern std::string command_history_string;
     extern bool overwrite_files;
     extern void (*check_overwrite_files_func) (const std::string& name);
     extern bool fail_on_warn;
     extern bool terminal_use_colour;
+    extern const std::thread::id main_thread_ID;
 
     extern int argc;
     extern const char* const* argv;
 
     extern const char* project_version;
-    extern const char* build_date;
+    extern const char* project_build_date;
 
 
     const char* argtype_description (ArgType type);
@@ -58,7 +65,6 @@ namespace MR
     std::string help_synopsis (int format);
     std::string help_tail (int format);
     std::string usage_syntax (int format);
-    
 
 
 
@@ -71,6 +77,40 @@ namespace MR
       public:
         Description& operator+ (const char* text) {
           push_back (text);
+          return *this;
+        }
+
+        Description& operator+ (const char* const text[]) {
+          for (const char* const* p = text; *p; ++p)
+            push_back (*p);
+          return *this;
+        }
+
+        std::string syntax (int format) const;
+    };
+
+
+
+    //! object for storing a single example command usage
+    class Example { NOMEMALIGN
+      public:
+        Example (const std::string& title,
+                 const std::string& code,
+                 const std::string& description) :
+            title (title),
+            code (code),
+            description (description) { }
+        const std::string title, code, description;
+
+        operator std::string () const;
+        std::string syntax (int format) const;
+    };
+
+    //! a class to hold the list of Example's
+    class ExampleList : public vector<Example> { NOMEMALIGN
+      public:
+        ExampleList& operator+ (const Example& example) {
+          push_back (example);
           return *this;
         }
 
@@ -125,12 +165,12 @@ namespace MR
 
 
 
-    inline void check_overwrite (const std::string& name) 
+    inline void check_overwrite (const std::string& name)
     {
       if (Path::exists (name) && !overwrite_files) {
         if (check_overwrite_files_func)
           check_overwrite_files_func (name);
-        else 
+        else
           throw Exception ("output file \"" + name + "\" already exists (use -force option to force overwrite)");
       }
     }
@@ -143,6 +183,12 @@ namespace MR
      * argument and options have been specified, and before any further
      * processing takes place. */
     void init (int argc, const char* const* argv);
+
+    //! verify that command's usage() function has set requisite fields [used internally]
+    void verify_usage ();
+
+    //! option parsing that should happen before GUI creation [used internally]
+    void parse_special_options ();
 
     //! do the actual parsing of the command-line [used internally]
     void parse ();
@@ -170,11 +216,18 @@ namespace MR
         uint64_t as_uint () const { return uint64_t (as_int()); }
         default_type as_float () const;
 
-        vector<int> as_sequence_int () const {
+        vector<int32_t> as_sequence_int () const {
           assert (arg->type == IntSeq);
-          try { return parse_ints (p); }
+          try { return parse_ints<int32_t> (p); }
           catch (Exception& e) { error (e); }
-          return vector<int>();
+          return vector<int32_t>();
+        }
+
+        vector<uint32_t> as_sequence_uint () const {
+          assert (arg->type == IntSeq);
+          try { return parse_ints<uint32_t> (p); }
+          catch (Exception& e) { error (e); }
+          return vector<uint32_t>();
         }
 
         vector<default_type> as_sequence_float () const {
@@ -193,7 +246,8 @@ namespace MR
         operator long long unsigned int () const { return as_uint(); }
         operator float () const { return as_float(); }
         operator double () const { return as_float(); }
-        operator vector<int> () const { return as_sequence_int(); }
+        operator vector<int32_t> () const { return as_sequence_int(); }
+        operator vector<uint32_t> () const { return as_sequence_uint(); }
         operator vector<default_type> () const { return as_sequence_float(); }
 
         const char* c_str () const { return p; }
@@ -232,7 +286,28 @@ namespace MR
     class ParsedOption { NOMEMALIGN
       public:
         ParsedOption (const Option* option, const char* const* arguments) :
-          opt (option), args (arguments) { }
+            opt (option), args (arguments)
+        {
+          for (size_t i = 0; i != option->size(); ++i) {
+            const char* p = arguments[i];
+            if (!consume_dash (p))
+              continue;
+            if (( (*option)[i].type == ImageIn || (*option)[i].type == ImageOut ) && is_dash (arguments[i]))
+              continue;
+            if ((*option)[i].type == Integer || (*option)[i].type == Float || (*option)[i].type == IntSeq ||
+                (*option)[i].type == FloatSeq || (*option)[i].type == Various)
+              continue;
+            WARN (std::string("Value \"") + arguments[i] + "\" is being used as " +
+                ((option->size() == 1) ?
+                 "the expected argument " :
+                 ("one of the " + str(option->size()) + " expected arguments ")) +
+                "for option \"-" + option->id + "\", yet this itself looks like a separate command-line option; " +
+                "the requisite input" +
+                ((option->size() == 1) ? " " : "s ") +
+                "to command-line option \"-" + option->id + "\" may have been erroneously omitted, which may cause " +
+                "other command-line parsing errors");
+          }
+        }
 
         //! reference to the corresponding Option entry in the OPTIONS section
         const Option* opt;
@@ -263,7 +338,7 @@ namespace MR
      * a paragraph to the description using the '+' operator, e.g.:
      * \code
      * void usage() {
-     *   DESCRIPTION 
+     *   DESCRIPTION
      *   + "This command can be used in lots of ways "
      *     "and is very versatile."
      *
@@ -274,6 +349,24 @@ namespace MR
      */
     extern Description DESCRIPTION;
 
+    //! example usages of the command
+    /*! This is designed to be used within each command's usage() function. Add
+     * various examples in order to demonstrate the different syntaxes and/or
+     * capabilities of the command, e.g.:
+     * \code
+     * void usage() {
+     *   ...
+     *
+     *   EXAMPLES
+     *   + Example ("Perform the command's default functionality",
+     *              "input2output input.mif output.mif",
+     *              "The default usage of this command is as trivial as "
+     *              "providing the name of the command, then the input image, "
+     *              "then the output image.");
+     * }
+     * \endcode
+     */
+    extern ExampleList EXAMPLES;
 
     //! the arguments expected by the command
     /*! This is designed to be used within each command's usage() function. Add
@@ -286,7 +379,7 @@ namespace MR
      *   ARGUMENTS
      *   + Argument ("in", "the input image").type_image_in()
      *   + Argument ("factor", "the factor to use in the analysis").type_float()
-     *   + Argument ("out", "the output image").type_image_out(); 
+     *   + Argument ("out", "the output image").type_image_out();
      * }
      * \endcode
      */
@@ -310,6 +403,7 @@ namespace MR
      * \endcode
      */
     extern OptionList OPTIONS;
+
 
     //! set to false if command can operate with no arguments
     /*! By default, the help page is shown command is invoked without
@@ -355,12 +449,12 @@ namespace MR
      * }
      * \endcode */
     const vector<ParsedOption> get_options (const std::string& name);
-    
-    
+
+
     //! Returns the option value if set, and the default otherwise.
     /*! Returns the value of (the first occurence of) option \c name
      *  or the default value provided as second argument.
-     * 
+     *
      * Use:
      * \code
      *  float arg1 = get_option_value("myopt", arg1_default);
@@ -374,7 +468,7 @@ namespace MR
       T r = (opt.size()) ? opt[0][0] : default_value;
       return r;
     }
-    
+
 
     //! convenience function provided mostly to ease writing Exception strings
     inline std::string operator+ (const char* left, const App::ParsedArgument& right)

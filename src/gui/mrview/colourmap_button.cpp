@@ -1,20 +1,22 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
 
-
-#include "gui/mrview/colourmap_button.h"
-#include "gui/mrview/colourmap.h"
 #include "math/rng.h"
+#include "gui/gui.h"
+#include "gui/mrview/colourmap_button.h"
 
 
 namespace MR
@@ -32,7 +34,9 @@ ColourMapButton::ColourMapButton(QWidget* parent, ColourMapButtonObserver& obs,
                                  bool use_customise_state_items) :
     QToolButton(parent),
     observer(obs),
-    core_colourmaps_actions(new QActionGroup(parent))
+    core_colourmaps_actions(new QActionGroup(parent)),
+    invert_scale_action (nullptr),
+    fixed_colour_index (0)
 {
     setToolTip(tr("Colourmap menu"));
     setIcon(QIcon(":/colourmap.svg"));
@@ -58,7 +62,7 @@ void ColourMapButton::init_core_menu_items(bool create_shortcuts)
         addAction(action);
 
         if (create_shortcuts)
-          action->setShortcut(QObject::tr(std::string ("Ctrl+" + str (n+1)).c_str()));
+          action->setShortcut (qstr ("Ctrl+" + str (n+1)));
 
         colourmap_actions.push_back (action);
         n++;
@@ -72,6 +76,7 @@ void ColourMapButton::init_core_menu_items(bool create_shortcuts)
 
 void ColourMapButton::init_custom_colour_menu_items()
 {
+    fixed_colour_index = colourmap_actions.size();
     custom_colour_action = new QAction(tr("Custom colour..."), this);
     custom_colour_action->setCheckable(true);
     connect(custom_colour_action, SIGNAL(triggered ()), this, SLOT(select_colour_slot()));
@@ -103,7 +108,7 @@ void ColourMapButton::init_special_colour_menu_items(bool create_shortcuts)
         addAction(action);
 
         if (create_shortcuts)
-          action->setShortcut(QObject::tr(std::string ("Ctrl+" + str (n+1)).c_str()));
+          action->setShortcut (qstr ("Ctrl+" + str (n+1)));
 
         colourmap_actions.push_back(action);
         n++;
@@ -118,9 +123,9 @@ void ColourMapButton::init_customise_state_menu_items()
     show_colour_bar->setChecked(true);
     addAction(show_colour_bar);
 
-    auto invert_scale = colourmap_menu->addAction(tr("Invert"), this, SLOT(invert_colourmap_slot(bool)));
-    invert_scale->setCheckable(true);
-    addAction(invert_scale);
+    invert_scale_action = colourmap_menu->addAction(tr("Invert"), this, SLOT(invert_colourmap_slot(bool)));
+    invert_scale_action->setCheckable(true);
+    addAction(invert_scale_action);
 
     QAction* reset_intensity = colourmap_menu->addAction(tr("Reset intensity"), this, SLOT(reset_intensity_slot()));
     addAction(reset_intensity);
@@ -156,6 +161,20 @@ void ColourMapButton::set_colourmap_index(size_t index)
         action->setChecked(true);
         select_colourmap_slot(action);
     }
+}
+
+void ColourMapButton::set_scale_inverted(bool yesno)
+{
+    assert (invert_scale_action != nullptr);
+    invert_scale_action->setChecked (yesno);
+}
+
+
+void ColourMapButton::set_fixed_colour()
+{
+    QAction* action = colourmap_actions[fixed_colour_index];
+    action->setChecked(true);
+    select_colourmap_slot(action);
 }
 
 

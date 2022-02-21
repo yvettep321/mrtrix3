@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "command.h"
 #include "image.h"
@@ -24,7 +26,7 @@ using namespace App;
 class TransformBase { MEMALIGN(TransformBase)
   public:
     virtual ~TransformBase(){}
-    virtual Eigen::Vector3 transform_point (const Eigen::Vector3& input) = 0;
+    virtual Eigen::Vector3d transform_point (const Eigen::Vector3d& input) = 0;
 };
 
 
@@ -32,8 +34,8 @@ class Warp : public TransformBase { MEMALIGN(Warp)
   public:
     Warp (Image<default_type>& in) : interp (in) {}
 
-    Eigen::Vector3 transform_point (const Eigen::Vector3 &input) {
-      Eigen::Vector3 output;
+    Eigen::Vector3d transform_point (const Eigen::Vector3d &input) {
+      Eigen::Vector3d output;
       if (interp.scanner (input))
         output = interp.row(3);
       else
@@ -50,8 +52,8 @@ class Linear : public TransformBase { MEMALIGN(Linear)
   public:
     Linear (const transform_type& transform) : transform (transform) {}
 
-    Eigen::Vector3 transform_point (const Eigen::Vector3 &input) {
-       Eigen::Vector3 output = transform * input;
+    Eigen::Vector3d transform_point (const Eigen::Vector3d &input) {
+       Eigen::Vector3d output = transform * input;
        return output;
     }
 
@@ -66,21 +68,25 @@ void usage ()
   SYNOPSIS = "Compose any number of linear transformations and/or warps into a single transformation";
 
   DESCRIPTION
-  + "The input linear transforms must be supplied in as a 4x4 matrix in a text file (as per the output of mrregister)."
-    "The input warp fields must be supplied as a 4D image representing a deformation field (as output from mrrregister -nl_warp).";
+  + "Any linear transforms must be supplied as a 4x4 matrix in a text file (e.g. as per the output of mrregister). "
+    "Any warp fields must be supplied as a 4D image representing a deformation field (e.g. as output from mrrregister -nl_warp)."
+
+  + "Input transformations should be provided to the command in the order in which they would be applied "
+    "to an image if they were to be applied individually."
+
+  + "If all input transformations are linear, and the -template option is not provided, then the file output by "
+    "the command will also be a linear transformation saved as a 4x4 matrix in a text file. If a template image is "
+    "supplied, then the output will always be a deformation field. If at least one of the inputs is a warp field, "
+    "then the output will be a deformation field, which will be defined on the grid of the last input warp image "
+    "supplied if the -template option is not used.";
 
   ARGUMENTS
-  + Argument ("input", "the input transforms (either linear or non-linear warps). List transforms in the order you like them to be "
-                       "applied to an image (as if you were applying them seperately with mrtransform).").type_file_in().allow_multiple()
-
-  + Argument ("output", "the output file. If all input transformations are linear, then the output will also be a linear "
-                        "transformation saved as a 4x4 matrix in a text file. If a template image is supplied, then the output will "
-                        "always be a deformation field (see below). If all inputs are warps, or a mix of linear and warps, then the "
-                        "output will be a deformation field defined on the grid of the last input warp supplied.").type_file_out ();
+  + Argument ("input", "the input transforms (either linear or non-linear warps).").type_file_in().allow_multiple()
+  + Argument ("output", "the output file (may be a linear transformation text file, or a deformation warp field image, depending on usage)").type_various();
 
   OPTIONS
-  + Option ("template", "define the output  grid defined by a template image")
-  + Argument ("image").type_image_in();
+  + Option ("template", "define the output grid defined by a template image")
+    + Argument ("image").type_image_in();
 
 }
 
@@ -152,11 +158,11 @@ void run ()
 
     Transform template_transform (output);
     for (auto i = Loop ("composing transformations", output, 0, 3) (output); i ; ++i) {
-      Eigen::Vector3 voxel ((default_type) output.index(0),
+      Eigen::Vector3d voxel ((default_type) output.index(0),
                             (default_type) output.index(1),
                             (default_type) output.index(2));
 
-      Eigen::Vector3 position = template_transform.voxel2scanner * voxel;
+      Eigen::Vector3d position = template_transform.voxel2scanner * voxel;
       ssize_t index = transform_list.size() - 1;
       while (index >= 0) {
         position = transform_list[index]->transform_point (position);

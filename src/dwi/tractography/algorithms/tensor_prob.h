@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_tractography_algorithms_tensor_prob_h__
 #define __dwi_tractography_algorithms_tensor_prob_h__
@@ -66,7 +68,7 @@ namespace MR
 
 
 
-            bool init() {
+            bool init() override {
               source.clear();
               if (!source.get (pos, values))
                 return false;
@@ -75,14 +77,14 @@ namespace MR
 
 
 
-            term_t next () {
+            term_t next () override {
               if (!source.get (pos, values))
                 return EXIT_IMAGE;
               return Tensor_Det::do_next();
             }
 
 
-            void truncate_track (vector<Eigen::Vector3f>& tck, const size_t length_to_revert_from, const int revert_step) {}
+            void truncate_track (GeneratedTrack& tck, const size_t length_to_revert_from, const size_t revert_step) override { assert (0); }
 
 
           protected:
@@ -103,7 +105,7 @@ namespace MR
 
                   for (ssize_t i = 0; i < residuals.size(); ++i) {
                     residuals[i] = residuals[i] ? (data[i] - std::exp (-residuals[i])) : float(0.0);
-                    data[i] += uniform_int (*rng) ? residuals[i] : -residuals[i];
+                    data[i] += uniform_int (rng) ? residuals[i] : -residuals[i];
                   }
                 }
 
@@ -117,23 +119,22 @@ namespace MR
             class Interp : public Interpolator<Bootstrap<Image<float>,WildBootstrap>>::type { MEMALIGN(Interp)
               public:
                 Interp (const Bootstrap<Image<float>,WildBootstrap>& bootstrap_vox) :
-                  Interpolator<Bootstrap<Image<float>,WildBootstrap> >::type (bootstrap_vox) {
-                    for (size_t i = 0; i < 8; ++i)
-                      raw_signals.push_back (Eigen::VectorXf (size(3)));
-                  }
+                    Interpolator<Bootstrap<Image<float>,WildBootstrap> >::type (bootstrap_vox)
+                {
+                  for (size_t i = 0; i < 8; ++i)
+                    raw_signals.push_back (Eigen::VectorXf (size(3)));
+                }
 
                 vector<Eigen::VectorXf> raw_signals;
 
                 bool get (const Eigen::Vector3f& pos, Eigen::VectorXf& data) {
-                  scanner (pos);
-                  if (out_of_bounds) {
+                  if (!scanner (pos)) {
                     data.fill (NaN);
                     return false;
                   }
 
                   data.setZero();
 
-                  // Modified to be consistent with the new Interp::Linear implementation
                   size_t i = 0;
                   for (ssize_t z = 0; z < 2; ++z) {
                     index(2) = clamp (P[2]+z, size(2));

@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __gui_mrview_image_h__
 #define __gui_mrview_image_h__
@@ -41,6 +43,10 @@ namespace MR
         class ODF;
       }
 
+
+
+
+
       class ImageBase : public Volume
       { MEMALIGN(ImageBase)
         public:
@@ -61,6 +67,11 @@ namespace MR
 
       };
 
+
+
+
+
+
       class Image : public ImageBase
       { MEMALIGN(Image)
         public:
@@ -77,18 +88,20 @@ namespace MR
           cfloat trilinear_value (const Eigen::Vector3f&) const;
           cfloat nearest_neighbour_value (const Eigen::Vector3f&) const;
 
-          const MR::Transform& transform() const { return linear_interp; }
+          const transform_type& transform() const { return image.transform(); }
           const vector<std::string>& comments() const { return _comments; }
 
           void reset_windowing (const int, const bool);
 
         protected:
-          mutable MR::Interp::Linear <MR::Image<cfloat>> linear_interp;
-          mutable MR::Interp::Nearest<MR::Image<cfloat>> nearest_interp;
-          friend class Tool::ODF;
+
+          struct CachedTexture { MEMALIGN(CachedTexture)
+            GL::Texture tex;
+            float value_min, value_max;
+          };
 
           std::array<float, 3> slice_min, slice_max;
-          std::unordered_map<size_t, GL::Texture> tex_4d_cache;
+          std::unordered_map<size_t, CachedTexture> tex_4d_cache;
 
         private:
           bool volume_unchanged ();

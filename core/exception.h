@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __mrtrix_exception_h__
 #define __mrtrix_exception_h__
@@ -27,18 +29,18 @@
 
 namespace MR
 {
-  namespace App 
+  namespace App
   {
     extern int log_level;
-    extern std::string NAME;
+    extern int exit_error_code;
   }
 
-  //! print primary output to stdout as-is. 
+  //! print primary output to stdout as-is.
   /*! This function is intended for cases where the command's primary output is text, not
    * image data, etc. It is \e not designed for error or status reports: it
    * prints to stdout, whereas all reporting functions print to stderr. This is
    * to allow the output of the command to be used directly in text processing
-   * pipeline or redirected to file. 
+   * pipeline or redirected to file.
    * \note the use of stdout is normally reserved for piping data files (or at
    * least their filenames) between MRtrix commands. This function should
    * therefore never be used in commands that produce output images, as the two
@@ -48,10 +50,10 @@ namespace MR
 
 
   //! \cond skip
-  
+
   // for internal use only
-  
-  inline void __print_stderr (const std::string& text) 
+
+  inline void __print_stderr (const std::string& text)
   {
 #ifdef MRTRIX_AS_R_LIBRARY
     REprintf (text.c_str());
@@ -61,7 +63,7 @@ namespace MR
   }
   //! \endcond
 
-  //! display error, warning, debug, etc. message to user 
+  //! display error, warning, debug, etc. message to user
   /*! types are: 0: error; 1: warning; 2: additional information; 3:
    * debugging information; anything else: none. */
   extern void (*report_to_user_func) (const std::string& msg, int type);
@@ -77,6 +79,8 @@ namespace MR
 
   class Exception { NOMEMALIGN
     public:
+      Exception () { }
+
       Exception (const std::string& msg) {
         description.push_back (msg);
       }
@@ -98,6 +102,10 @@ namespace MR
       void push_back (const std::string& s) {
         description.push_back (s);
       }
+      void push_back (const Exception& e) {
+        for (auto s : e.description)
+          push_back (s);
+      }
 
       static void (*display_func) (const Exception& E, int log_level);
 
@@ -111,26 +119,35 @@ namespace MR
         : Exception(previous_exception, msg) {}
   };
 
+
+  class CancelException : public Exception { NOMEMALIGN
+    public:
+      CancelException () : Exception ("operation cancelled by user") { }
+  };
+
   void display_exception_cmdline (const Exception& E, int log_level);
   void cmdline_print_func (const std::string& msg);
   void cmdline_report_to_user_func (const std::string& msg, int type);
 
 
 
-    class LogLevelLatch { NOMEMALIGN
-      public:
-        LogLevelLatch (const int new_level) :
-          prev_level (App::log_level) {
-            App::log_level = new_level;
-          }
+  class LogLevelLatch { NOMEMALIGN
+    public:
+      LogLevelLatch (const int new_level) :
+          prev_level (App::log_level)
+      {
+        App::log_level = new_level;
+      }
+      ~LogLevelLatch () {
+        App::log_level = prev_level;
+      }
+    private:
+      const int prev_level;
+  };
 
-        ~LogLevelLatch () {
-          App::log_level = prev_level;
-        }
 
-      private:
-        const int prev_level;
-    };
+  void check_app_exit_code();
+
 
 }
 

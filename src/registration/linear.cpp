@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "registration/linear.h"
 
@@ -79,6 +81,9 @@ namespace MR
         case 1:
           registration.set_stage_optimiser_default (Registration::OptimiserAlgoType::gd);
           break;
+        default:
+          assert (0 && "FIXME: linstage.optimiser.default not understood");
+          break;
         }
       }
 
@@ -90,6 +95,9 @@ namespace MR
           break;
         case 1:
           registration.set_stage_optimiser_first (Registration::OptimiserAlgoType::gd);
+          break;
+        default:
+          assert (0 && "FIXME: linstage.optimiser.first not understood");
           break;
         }
       }
@@ -103,13 +111,18 @@ namespace MR
         case 1:
           registration.set_stage_optimiser_last (Registration::OptimiserAlgoType::gd);
           break;
+        default:
+          assert (0 && "FIXME: linstage.optimiser.last not understood");
+          break;
         }
       }
 
       opt = get_options("linstage.iterations");
       if (opt.size()) {
-        vector<int> iterations = parse_ints (opt[0][0]);
+        const auto iterations = parse_ints<uint32_t> (opt[0][0]);
         registration.set_stage_iterations (iterations);
+      } else {
+        registration.set_stage_iterations (vector<uint32_t> {1});
       }
 
       opt = get_options("linstage.diagnostics.prefix");
@@ -335,12 +348,12 @@ namespace MR
     const OptionGroup fod_options =
       OptionGroup ("FOD registration options")
 
-      + Option ("directions", "the directions used for FOD reorienation using apodised point spread functions (Default: 60 directions)")
+      + Option ("directions", "the directions used for FOD reorientation using apodised point spread functions (Default: 60 directions)")
       + Argument ("file", "a list of directions [az el] generated using the gendir command.").type_file_in ()
 
       + Option ("noreorientation", "turn off FOD reorientation. Reorientation is on by default if the number "
                                    "of volumes in the 4th dimension corresponds to the number of coefficients in an "
-                                   "antipodally symmetric spherical harmonic series (i.e. 6, 15, 28, 45, 66 etc");
+                                   "antipodally symmetric spherical harmonic series (i.e. 6, 15, 28, 45, 66 etc)");
 
   }
 }

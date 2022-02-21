@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __gui_mrtrix_tools_tractography_scalar_file_options_h__
 #define __gui_mrtrix_tools_tractography_scalar_file_options_h__
@@ -32,13 +34,14 @@ namespace MR
       namespace Tool
       {
         class Tractogram;
+        class Tractography;
 
           class TrackScalarFileOptions : public QGroupBox, public DisplayableVisitor
           { MEMALIGN(TrackScalarFileOptions)
             Q_OBJECT
 
             public:
-              TrackScalarFileOptions (QWidget*);
+              TrackScalarFileOptions (Tractography*);
               virtual ~TrackScalarFileOptions () {}
 
               void set_tractogram (Tractogram* selected_tractogram);
@@ -48,7 +51,7 @@ namespace MR
               void update_UI();
               void set_scaling(default_type min, default_type max);
               void set_threshold(GUI::MRView::Tool::TrackThresholdType dataSource, default_type min, default_type max);
-
+              void set_colourmap (int colourmap_index);
 
             public slots:
               bool open_intensity_track_scalar_file_slot ();
@@ -66,8 +69,10 @@ namespace MR
               void threshold_upper_value_changed ();
               void invert_colourmap_slot ();
               void reset_intensity_slot ();
+            
 
             protected:
+              Tractography* tool;
               Tractogram *tractogram;
               Tool::Base::VBoxLayout *main_box;
               QGroupBox *colour_groupbox;

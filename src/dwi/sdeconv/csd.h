@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_sdeconv_csd_h__
 #define __dwi_sdeconv_csd_h__
@@ -55,13 +57,13 @@ namespace MR
               lmax_cmdline (0),
               lmax (0),
               niter (DEFAULT_CSD_NITER) {
-                grad = DWI::get_valid_DW_scheme (dwi_header);
+                grad = DWI::get_DW_scheme (dwi_header);
                 // Discard b=0 (b=0 normalisation not supported in this version)
                 // Only allow selection of one non-zero shell from command line
                 dwis = DWI::Shells (grad).select_shells (true, false, true).largest().get_volumes();
                 DW_dirs = DWI::gen_direction_matrix (grad, dwis);
 
-                lmax_data = Math::SH::LforN (dwis.size()); 
+                lmax_data = Math::SH::LforN (dwis.size());
               }
 
 
@@ -70,7 +72,7 @@ namespace MR
               using namespace App;
               auto opt = get_options ("lmax");
               if (opt.size()) {
-                auto list = parse_ints (opt[0][0]);
+                auto list = parse_ints<uint32_t> (opt[0][0]);
                 if (list.size() != 1)
                   throw Exception ("CSD algorithm expects a single lmax to be specified");
                 lmax_cmdline = list.front();
@@ -121,7 +123,7 @@ namespace MR
               if (lmax_response <= 0)
                 throw Exception ("response function does not contain anisotropic terms");
 
-              lmax = ( lmax_cmdline ? lmax_cmdline : std::min (lmax_response, DEFAULT_CSD_LMAX) );
+              lmax = ( lmax_cmdline ? lmax_cmdline : std::min (lmax_response, uint32_t(DEFAULT_CSD_LMAX)) );
 
               if (lmax <= 0 || lmax % 2)
                 throw Exception ("lmax must be a positive even integer");
@@ -188,19 +190,7 @@ namespace MR
               // min-norm constraint:
               if (norm_lambda) {
                 norm_lambda *= NORM_LAMBDA_MULTIPLIER * Mt_M (0,0);
-#ifndef USE_NON_ORTHONORMAL_SH_BASIS
                 Mt_M.diagonal().array() += norm_lambda;
-#else
-                int l = 0;
-                for (size_t i = 0; i < Mt_M.rows(); ++i) {
-                  if (Math::SH::index (l,0) == i) {
-                    Mt_M(i,i) += norm_lambda;
-                    l+=2;
-                  }
-                  else 
-                    Mt_M(i,i) += 0.5 * norm_lambda;
-                }
-#endif
               }
 
               INFO ("constrained spherical deconvolution initialised successfully");
@@ -216,7 +206,7 @@ namespace MR
             Eigen::MatrixXd rconv, HR_trans, M, Mt_M;
             default_type neg_lambda, norm_lambda, threshold;
             vector<size_t> dwis;
-            int lmax_response, lmax_data, lmax_cmdline, lmax;
+            uint32_t lmax_response, lmax_data, lmax_cmdline, lmax;
             size_t niter;
         };
 
@@ -267,7 +257,7 @@ namespace MR
             for (size_t i = 0; i < neg.size(); i++)
               HR_T.row (i) = shared.HR_trans.row (neg[i]);
             auto HR_T_view = HR_T.topRows (neg.size());
-            work.triangularView<Eigen::Lower>() += HR_T_view.transpose() * HR_T_view; 
+            work.triangularView<Eigen::Lower>() += HR_T_view.transpose() * HR_T_view;
           }
 
           F.noalias() = llt.compute (work.triangularView<Eigen::Lower>()).solve (Mt_b);

@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "command.h"
 #include "debug.h"
@@ -34,7 +36,8 @@ void usage ()
   OPTIONS
   + Option ("all", "print all DICOM fields.")
 
-  + Option ("csa", "print all Siemens CSA fields")
+  + Option ("csa", "print all Siemens CSA fields (excluding Phoenix unless requested)")
+  + Option ("phoenix", "print Siemens Phoenix protocol information")
 
   + Option ("tag", "print field specified by the group & element tags supplied. "
       "Tags should be supplied as Hexadecimal (i.e. as they appear in the -all listing).")
@@ -75,11 +78,8 @@ void run ()
     while (item.read()) {
       for (size_t n = 0; n < opt.size(); ++n)
         if (item.is (tags[n].group, tags[n].element))
-          tags[n].value = join (item.get_string(), " ");
+          std::cout << MR::printf ("[%04X,%04X] ", tags[n].group, tags[n].element) <<  item.as_string() << "\n";
     }
-
-    for (size_t n = 0; n < opt.size(); ++n)
-      std::cout << tags[n].value << "\n";
 
     return;
   }
@@ -87,13 +87,17 @@ void run ()
 
   File::Dicom::QuickScan reader;
 
-  if (get_options("all").size())
+  const bool all = get_options("all").size();
+  const bool csa = get_options("csa").size();
+  const bool phoenix = get_options("phoenix").size();
+
+  if (all)
     print (File::Dicom::Element::print_header());
 
-  if (reader.read (argument[0], get_options ("all").size(), get_options ("csa").size(), true))
+  if (reader.read (argument[0], all, csa, phoenix, true))
     throw Exception ("error reading file \"" + reader.filename + "\"");
 
-  if (!get_options ("all").size() && !get_options ("csa").size())
+  if (!all && !csa && !phoenix)
     std::cout << reader;
 }
 

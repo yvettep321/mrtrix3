@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __dwi_tractography_act_method_h__
 #define __dwi_tractography_act_method_h__
@@ -22,6 +24,7 @@
 #include "dwi/tractography/tracking/types.h"
 
 #include "interp/linear.h"
+#include "interp/masked.h"
 
 
 #define GMWMI_NORMAL_PERTURBATION 0.001
@@ -48,7 +51,12 @@ namespace MR
                 sgm_seed_to_wm (false),
                 act_image (shared.act().voxel) { }
 
-            ACT_Method_additions (const ACT_Method_additions&) = delete;
+            ACT_Method_additions (const ACT_Method_additions& that) :
+                sgm_depth (0),
+                seed_in_sgm (false),
+                sgm_seed_to_wm (false),
+                act_image (that.act_image) { }
+
             ACT_Method_additions() = delete;
 
 
@@ -150,7 +158,7 @@ namespace MR
 
 
           private:
-            Interp::Linear<Image<float>> act_image;
+            Interp::Masked<Interp::Linear<Image<float>>> act_image;
             Tissues tissue_values;
 
         };

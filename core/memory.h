@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __memory_h__
 #define __memory_h__
@@ -25,7 +27,7 @@
 namespace MR
 {
 
-  template<class T, class Deleter = std::default_delete<T>> 
+  template<class T, class Deleter = std::default_delete<T>>
     class copy_ptr : public std::unique_ptr<T, Deleter>
   { NOMEMALIGN
     public:
@@ -43,6 +45,8 @@ namespace MR
   struct compare_ptr_contents { NOMEMALIGN
     template <class X>
       bool operator() (const X& a, const X& b) const { return *a < *b; }
+    template <class X>
+      bool operator() (const std::shared_ptr<X>& a, const std::shared_ptr<X>& b) const { return *a < *b; }
   };
 
 }

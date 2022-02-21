@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "command.h"
 #include "image.h"
@@ -52,12 +54,18 @@ void usage ()
   + "Typical usage is to convert a parcellation image provided by some other software, based on "
     "the lookup table provided by that software, to conform to a new lookup table, particularly "
     "one where the node indices increment from 1, in preparation for connectome construction; "
-    "examples of such target lookup table files are provided in share//mrtrix3//labelconvert//";
+    "examples of such target lookup table files are provided in share//mrtrix3//labelconvert//, "
+    "but can be created by the user to provide the desired node set // ordering // colours.";
 
+  EXAMPLES
+  + Example ("Convert a Desikan-Killiany parcellation image as provided by FreeSurfer to have nodes incrementing from 1",
+             "labelconvert aparc+aseg.mgz FreeSurferColorLUT.txt mrtrix3//share//mrtrix3//labelconvert//fs_default.txt nodes.mif",
+             "Paths to the files in the example above would need to be revised according to their "
+             "locations on the user's system.");
 
   ARGUMENTS
   + Argument ("path_in",   "the input image").type_image_in()
-  + Argument ("lut_in",    "the connectome lookup table for the input image").type_file_in()
+  + Argument ("lut_in",    "the connectome lookup table corresponding to the input image").type_file_in()
   + Argument ("lut_out",   "the target connectome lookup table for the output image").type_file_in()
   + Argument ("image_out", "the output image").type_image_out();
 
@@ -121,32 +129,31 @@ void run ()
   auto opt = get_options ("spine");
   if (opt.size()) {
 
-    if (duplicates) {
-      WARN ("Could not add spine node: \"" + SPINE_NODE_NAME + "\" appears multiple times in output LUT");
+    if (duplicates)
+      throw Exception ("Cannot add spine node: \"" + SPINE_NODE_NAME + "\" appears multiple times in output LUT");
+    if (!spine_index)
+      throw Exception ("Cannot add spine node: \"" + SPINE_NODE_NAME + "\" not present in output LUT");
+
+    auto in_spine = Image<bool>::open (opt[0][0]);
+    if (dimensions_match (in_spine, out)) {
+
+      for (auto l = Loop (in_spine) (in_spine, out); l; ++l) {
+        if (in_spine.value())
+          out.value() = spine_index;
+      }
+
     } else {
 
-      auto in_spine = Image<bool>::open (opt[0][0]);
-      if (dimensions_match (in_spine, out)) {
+      WARN ("Spine node is being created from the mask image provided using -spine option using nearest-neighbour interpolation;");
+      WARN ("recommend using the parcellation image as the basis for this mask so that interpolation is not required");
 
-        for (auto l = Loop (in_spine) (in_spine, out); l; ++l) {
-          if (in_spine.value())
-            out.value() = spine_index;
-        }
-
-      } else {
-
-        WARN ("Spine node is being created from the mask image provided using -spine option using nearest-neighbour interpolation;");
-        WARN ("recommend using the parcellation image as the basis for this mask so that interpolation is not required");
-
-        Transform transform (out);
-        Interp::Nearest<decltype(in_spine)> nearest (in_spine);
-        for (auto l = Loop (out) (out); l; ++l) {
-          Eigen::Vector3 p (out.index (0), out.index (1), out.index (2));
-          p = transform.voxel2scanner * p;
-          if (nearest.scanner (p) && nearest.value())
-            out.value() = spine_index;
-        }
-
+      Transform transform (out);
+      Interp::Nearest<decltype(in_spine)> nearest (in_spine);
+      for (auto l = Loop (out) (out); l; ++l) {
+        Eigen::Vector3d p (out.index (0), out.index (1), out.index (2));
+        p = transform.voxel2scanner * p;
+        if (nearest.scanner (p) && nearest.value())
+          out.value() = spine_index;
       }
 
     }

@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __image_adapter_median_h__
 #define __image_adapter_median_h__
@@ -20,13 +22,13 @@
 
 namespace MR
 {
-    namespace Adapter 
+    namespace Adapter
     {
 
 
     template <class ImageType>
-        class Median : 
-          public Base<Median<ImageType>,ImageType> 
+        class Median :
+          public Base<Median<ImageType>,ImageType>
       { MEMALIGN(Median<ImageType>)
       public:
 
@@ -43,20 +45,20 @@ namespace MR
             set_extent (vector<int>(1,3));
           }
 
-        Median (const ImageType& parent, const vector<int>& extent) :
+        Median (const ImageType& parent, const vector<uint32_t>& extent) :
           base_type (parent) {
             set_extent (extent);
           }
 
-        void set_extent (const vector<int>& ext)
+        void set_extent (const vector<uint32_t>& ext)
         {
           for (size_t i = 0; i < ext.size(); ++i)
-            if (! (ext[i] & int(1)))
+            if (! (ext[i] & uint32_t(1)))
               throw Exception ("expected odd number for extent");
           if (ext.size() != 1 && ext.size() != 3)
             throw Exception ("unexpected number of elements specified in extent");
           if (ext.size() == 1)
-            extent = vector<int> (3, ext[0]);
+            extent = vector<uint32_t> (3, ext[0]);
           else
             extent = ext;
 
@@ -97,7 +99,7 @@ namespace MR
         }
 
       protected:
-        vector<int> extent;
+        vector<uint32_t> extent;
         vector<value_type> values;
       };
 

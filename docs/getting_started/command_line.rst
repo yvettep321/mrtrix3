@@ -51,7 +51,7 @@ The following cases would also *not* be interpreted correctly by *MRtrix3*,
 even though some other softwares may interpret their command-line options in
 such ways:
 
-.. code::
+.. code-block:: console
 
     $ command -number10 argument1 argument2
     $ command --number=10 argument1 argument2
@@ -72,18 +72,17 @@ command-line *does* matter, and hence the above demonstration does not apply:
    by the tool associated with that option.
 
 -  *Scripts*: A subset of the Python scripts provided with *MRtrix3*
-   (currently :ref:`5ttgen` and :ref:`dwi2response`) require the selection
-   of an *algorithm*, which defines the approach that the script will use to
-   arrive at its end result based on the data provided. The name of this
-   algorithm *must* be the *first* argument on the command-line; any
-   command-line options provided *prior* to this algorithm name will be
-   **silently ignored**.
+   require the selection of an *algorithm*, which defines the approach that
+   the script will use to arrive at its end result based on the data
+   provided. The name of this algorithm *must* be the *first* argument on
+   the command-line; any command-line options provided *prior* to this
+   algorithm name will be **silently ignored**.
 
 
 .. _number_sequences:
 
-Number sequences and floating-point lists
------------------------------------------
+Number sequences
+----------------
 
 Some options expect arguments in the form of *number sequences* or
 *floating-point lists of numbers*. The former consists or a series of
@@ -98,10 +97,32 @@ For example:
 Note that the sign of the increment does not matter, it will always run
 in the direction required.
 
+Certain commands (e.g. ``mrconvert``) also accept the special ``end``
+keyword, which will take on the largest possible value along the corresponding
+axis. For example, the following command can be used to extract every other
+volume from an input 4D image:
+
+.. code-block:: console
+
+    $ mrconvert input.mif -coord 3 0:2:end output.mif
+
+
+
+Floating-point lists
+--------------------
+
 Likewise, floating-point lists consist of a comma-separated list of
 numbers, for example:
 
 -  ``2.47,-8.2223,1.45e-3``
+
+As in the integer case, it is also possible to supply a range of values using
+the colon syntax, although in this case the increment is mandatory. For
+example:
+
+- ``3.1:2.2:10`` expands to ``[ 3.1 5.3 7.5 9.7 ]``
+
+The ``nan`` keyword can also be provided to insert a Not-a-Number.
 
 
 Using shortened option names
@@ -112,20 +133,20 @@ of the option provided is sufficient to unambiguously identify it.
 
 For example:
 
-.. code::
+.. code-block:: console
 
     $ mrconvert -debug in.mif out.nii.gz
 
 is the same as:
 
-.. code::
+.. code-block:: console
 
     $ mrconvert -de in.mif out.nii.gz
 
 but will conflict with the ``-datatype`` option if shortened any
 further:
 
-.. code::
+.. code-block:: console
 
     $ mrconvert -d in.mif out.nii.gz
     mrconvert: [ERROR] several matches possible for option "-d": "-datatype, "-debug"
@@ -166,6 +187,26 @@ indicates to the system that the output of the first command is to be
 used as input for the next command. The image that is to be fed to or
 from the pipeline is specified for each program using a single dash
 ``-`` where the image would normally be specified as an argument.
+
+.. WARNING::
+
+   If you use the ``-`` symbol *without* piping through to the next command,
+   the temporary file created will *not* be deleted.
+
+   For example, with a command like this:
+
+   .. code-block:: console
+
+       $ mrconvert image.mif -
+
+   ``mrconvert`` has no way to tell that the image it produced hasn't been passed
+   onto another command. This means the temporary file it creates will remain
+   on the filesystem (default: ``/tmp/`` on Unix, '.' on Windows, see
+   :ref:`mrtrix_config`), needlessly taking up storage space. Eventually this can
+   fill up the entire filesystem, causing subsequent commands to fail and creating
+   problems for the system as a whole. If this happens, the script
+   :ref:`mrtrix_cleanup` can be used to remove temporary files from a specific location.
+
 
 For this to work properly, it is important to know which arguments each
 program will interpret as input images, and which as output images. For

@@ -1,23 +1,24 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include <string>
 
 #include "gui/mrview/tool/roi_editor/roi.h"
 
 #include "header.h"
-#include "math/versor.h"
 #include "gui/cursor.h"
 #include "gui/projection.h"
 #include "gui/dialog/file.h"
@@ -82,6 +83,8 @@ namespace MR
 
           list_view = new QListView (this);
           list_view->setSelectionMode (QAbstractItemView::SingleSelection);
+          list_view->setHorizontalScrollBarPolicy (Qt::ScrollBarAlwaysOff);
+          list_view->setTextElideMode (Qt::ElideLeft);
           list_view->setDragEnabled (true);
           list_view->setDragDropMode (QAbstractItemView::InternalMove);
           list_view->setAcceptDrops (true);
@@ -262,7 +265,9 @@ namespace MR
             QModelIndex index = list_model->index (i, 0);
             ROI_Item* roi = list_model->get (index);
             if (!roi->saved) {
-              if (QMessageBox::question (&window(), tr("ROI not saved"), tr (("Image " + roi->get_filename() + " has been modified. Do you want to save it?").c_str()), QMessageBox::Yes|QMessageBox::No) == QMessageBox::Yes)
+              if (QMessageBox::question (&window(), tr("ROI not saved"),
+                    qstr ("Image " + roi->get_filename() + " has been modified. Do you want to save it?"),
+                    QMessageBox::Yes|QMessageBox::No) == QMessageBox::Yes)
                 save (roi);
             }
           }
@@ -291,7 +296,7 @@ namespace MR
 
         void ROI::open_slot ()
         {
-          vector<std::string> names = Dialog::File::get_images (this, "Select ROI images to open");
+          vector<std::string> names = Dialog::File::get_images (this, "Select ROI images to open", &current_folder);
           if (names.empty())
             return;
           vector<std::unique_ptr<MR::Header>> list;
@@ -326,6 +331,7 @@ namespace MR
                 load (list);
                 in_insert_mode = false;
             }
+            event->acceptProposedAction();
           }
         }
 
@@ -337,19 +343,19 @@ namespace MR
         {
           vector<GLubyte> data (roi->header().size(0) * roi->header().size(1) * roi->header().size(2));
           {
-            MRView::GrabContext context;
-            ASSERT_GL_MRVIEW_CONTEXT_IS_CURRENT;
+            GL::Context::Grab context;
+            GL::assert_context_is_current();
             roi->texture().bind();
             gl::PixelStorei (gl::PACK_ALIGNMENT, 1);
             gl::GetTexImage (gl::TEXTURE_3D, 0, gl::RED, gl::UNSIGNED_BYTE, (void*) (&data[0]));
-            ASSERT_GL_MRVIEW_CONTEXT_IS_CURRENT;
+            GL::assert_context_is_current();
           }
 
           try {
             MR::Header header (roi->header());
             header.ndim() = 3;
             header.datatype() = DataType::Bit;
-            std::string name = GUI::Dialog::File::get_save_image_name (&window(), "Select name of ROI to save", roi->get_filename());
+            std::string name = GUI::Dialog::File::get_save_image_name (&window(), "Select name of ROI to save", roi->get_filename(), &current_folder);
             if (name.size()) {
               auto out = MR::Image<bool>::create (name, header);
               roi->save (out, data.data());
@@ -365,11 +371,11 @@ namespace MR
 
 
 
-        int ROI::normal2axis (const Eigen::Vector3f& normal, const MR::Transform& transform) const
+        int ROI::normal2axis (const Eigen::Vector3f& normal, const ROI_Item& roi) const
         {
-          float x_dot_n = std::abs ((transform.image2scanner.rotation().cast<float>() * Eigen::Vector3f { 1.0f, 0.0f, 0.0f }).dot (normal));
-          float y_dot_n = std::abs ((transform.image2scanner.rotation().cast<float>() * Eigen::Vector3f { 0.0f, 1.0f, 0.0f }).dot (normal));
-          float z_dot_n = std::abs ((transform.image2scanner.rotation().cast<float>() * Eigen::Vector3f { 0.0f, 0.0f, 1.0f }).dot (normal));
+          float x_dot_n = abs ((roi.image2scanner().rotation().cast<float>() * Eigen::Vector3f { 1.0f, 0.0f, 0.0f }).dot (normal));
+          float y_dot_n = abs ((roi.image2scanner().rotation().cast<float>() * Eigen::Vector3f { 0.0f, 1.0f, 0.0f }).dot (normal));
+          float z_dot_n = abs ((roi.image2scanner().rotation().cast<float>() * Eigen::Vector3f { 0.0f, 0.0f, 1.0f }).dot (normal));
           if (x_dot_n > y_dot_n)
             return x_dot_n > z_dot_n ? 0 : 2;
           else
@@ -413,8 +419,8 @@ namespace MR
           assert (indices.size() == 1);
           ROI_Item* roi = dynamic_cast<ROI_Item*> (list_model->get (indices[0]));
           if (!roi->saved) {
-            std::basic_string<char> text = "ROI " + roi->get_filename() + " has been modified. Do you want to save it?";
-            size_t ret = QMessageBox::warning(this, tr("ROI not saved"), tr(text.c_str()),
+            size_t ret = QMessageBox::warning (this, tr("ROI not saved"),
+                qstr("ROI " + roi->get_filename() + " has been modified. Do you want to save it?"),
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
             if (ret == QMessageBox::Cancel)
               return;
@@ -502,8 +508,8 @@ namespace MR
           const Projection* proj = window().get_current_mode()->get_current_projection();
           if (!proj) return;
           const Eigen::Vector3f current_origin = proj->screen_to_model (window().mouse_position(), window().focus());
-          current_axis = normal2axis (proj->screen_normal(), roi->transform());
-          current_slice = std::lround ((roi->transform().scanner2voxel.cast<float>() * current_origin)[current_axis]);
+          current_axis = normal2axis (proj->screen_normal(), *roi);
+          current_slice = std::lround ((roi->scanner2voxel().cast<float>() * current_origin)[current_axis]);
 
           roi->start (ROI_UndoEntry (*roi, current_axis, current_slice));
 
@@ -548,7 +554,7 @@ namespace MR
 
         void ROI::draw (const Projection& projection, bool is_3D, int, int)
         {
-          ASSERT_GL_MRVIEW_CONTEXT_IS_CURRENT;
+          GL::assert_context_is_current();
           if (is_3D) return;
 
           if (!is_3D) {
@@ -577,7 +583,7 @@ namespace MR
             gl::Enable (gl::DEPTH_TEST);
             gl::DepthMask (gl::TRUE_);
           }
-          ASSERT_GL_MRVIEW_CONTEXT_IS_CURRENT;
+          GL::assert_context_is_current();
         }
 
 
@@ -753,19 +759,19 @@ namespace MR
 
           // figure out the closest ROI axis, and lock to it:
           ROI_Item* roi = dynamic_cast<ROI_Item*> (list_model->get (indices[0]));
-          current_axis = normal2axis (proj->screen_normal(), roi->transform());
+          current_axis = normal2axis (proj->screen_normal(), *roi);
 
           // figure out current slice in ROI:
-          current_slice = std::lround ((roi->transform().scanner2voxel.cast<float>() * current_origin)[current_axis]);
+          current_slice = std::lround ((roi->scanner2voxel() * current_origin)[current_axis]);
 
           // floating-point version of slice location to keep it consistent on
           // mouse move:
           Eigen::Vector3f slice_axis { 0.0, 0.0, 0.0 };
           slice_axis[current_axis] = current_axis == 2 ? 1.0 : -1.0;
-          slice_axis = roi->transform().image2scanner.rotation().cast<float>() * slice_axis;
+          slice_axis = roi->image2scanner().rotation().cast<float>() * slice_axis;
           current_slice_loc = current_origin.dot (slice_axis);
 
-          const Math::Versorf orient (roi->header().transform().rotation().cast<float>());
+          const Eigen::Quaternionf orient (roi->image2scanner().rotation());
           window().set_snap_to_image (false);
           window().set_orientation (orient);
           window().set_plane (current_axis);
@@ -814,7 +820,7 @@ namespace MR
           Eigen::Vector3f pos = proj->screen_to_model (window().mouse_position(), window().focus());
           Eigen::Vector3f slice_axis (0.0, 0.0, 0.0);
           slice_axis[current_axis] = current_axis == 2 ? 1.0 : -1.0;
-          slice_axis = roi->transform().image2scanner.rotation().cast<float>() * slice_axis;
+          slice_axis = roi->image2scanner().rotation().cast<float>() * slice_axis;
           float l = (current_slice_loc - pos.dot (slice_axis)) / proj->screen_normal().dot (slice_axis);
           window().set_focus (window().focus() + l * proj->screen_normal());
           const Eigen::Vector3f pos_adj = pos + l * proj->screen_normal();
@@ -881,7 +887,11 @@ namespace MR
             +   Argument ("image").type_image_in()
 
             + Option ("roi.opacity", "Sets the overlay opacity to floating value [0-1].").allow_multiple()
-            +   Argument ("value").type_float (0.0, 1.0);
+            +   Argument ("value").type_float (0.0, 1.0)
+
+            + Option ("roi.colour", "Sets the colour of the ROI overlay").allow_multiple()
+            +   Argument ("R,G,B").type_sequence_float();
+
         }
 
 
@@ -903,6 +913,23 @@ namespace MR
             try {
               float value = opt[0];
               opacity_slider->setSliderPosition(int(1.e3f*value));
+            }
+            catch (Exception& e) { e.display(); }
+            return true;
+          }
+
+          if (opt.opt->is ("roi.colour")) {
+            try {
+              auto values = parse_floats (opt[0]);
+              if (values.size() != 3)
+                throw Exception ("must provide exactly three comma-separated values to the -roi.colour option");
+              const float max_value = std::max ({ values[0], values[1], values[2] });
+              if (std::min ({ values[0], values[1], values[2] }) < 0.0 || max_value > 255)
+                throw Exception ("values provided to -roi.colour must be either between 0.0 and 1.0, or between 0 and 255");
+              const float multiplier = max_value <= 1.0 ? 255.0 : 1.0;
+              QColor colour (int(values[0] * multiplier), int(values[1]*multiplier), int(values[2]*multiplier));
+              colour_button->setColor (colour);
+              colour_changed();
             }
             catch (Exception& e) { e.display(); }
             return true;

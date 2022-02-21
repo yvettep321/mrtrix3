@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "file/dicom/patient.h"
 #include "file/dicom/study.h"
@@ -33,15 +35,15 @@ namespace MR {
             if (series_number == (*this)[n]->number) {
               if (image_type != (*this)[n]->image_type)
                 match = false;
-              if (series_modality.size() && (*this)[n]->modality.size()) 
-                if (series_modality != (*this)[n]->modality) 
+              if (series_modality.size() && (*this)[n]->modality.size())
+                if (series_modality != (*this)[n]->modality)
                   match = false;
               if (match) {
-                if (series_date.size() && (*this)[n]->date.size()) 
-                  if (series_date != (*this)[n]->date) 
+                if (series_date.size() && (*this)[n]->date.size())
+                  if (series_date != (*this)[n]->date)
                     match = false;
               }
-              if (match && !series_time_mismatch_warning_issued) {
+              if (match) {
                 float stime = NaN, stime_ref = NaN;
                 try {
                   stime = to<float> (series_time);
@@ -51,8 +53,12 @@ namespace MR {
                   INFO ("error reading DICOM series time - field does not exist or is empty?");
                 }
                 if (stime != stime_ref) {
-                  INFO ("WARNING: series times do not match - this may cause problem with series grouping");
-                  series_time_mismatch_warning_issued = true;
+                  if (!series_time_mismatch_warning_issued) {
+                    INFO ("WARNING: series times do not match - this may cause problem with series grouping");
+                    series_time_mismatch_warning_issued = true;
+                  }
+                  if (stime < stime_ref)
+                    (*this)[n]->time = series_time;
                 }
               }
               if (match)
@@ -79,13 +85,13 @@ namespace MR {
 
       std::ostream& operator<< (std::ostream& stream, const Study& item)
       {
-        stream << MR::printf ("    %-30s %-16s %10s %8s\n", 
-              item.name.c_str(), 
+        stream << MR::printf ("    %-30s %-16s %10s %8s\n",
+              item.name.c_str(),
               format_ID(item.ID).c_str(),
               format_date(item.date).c_str(),
               format_time(item.time).c_str() );
 
-        for (size_t n = 0; n < item.size(); n++) 
+        for (size_t n = 0; n < item.size(); n++)
           stream << *item[n];
 
         return stream;

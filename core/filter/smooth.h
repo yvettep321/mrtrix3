@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __image_filter_gaussian_h__
 #define __image_filter_gaussian_h__
@@ -73,18 +75,16 @@ namespace MR
         //! Set the extent of smoothing kernel in voxels.
         //! This can be set as a single value to be used for the first 3 dimensions
         //! or separate values, one for each dimension. (Default: 4 standard deviations)
-        void set_extent (const vector<int>& new_extent)
+        void set_extent (const vector<uint32_t>& new_extent)
         {
           if (new_extent.size() != 1 && new_extent.size() != 3)
             throw Exception ("Please supply a single kernel extent value, or three values (one for each spatial dimension)");
           for (size_t i = 0; i < new_extent.size(); ++i) {
-            if (!(new_extent[i] & int (1)))
+            if (!(new_extent[i] & uint32_t(1)))
               throw Exception ("expected odd number for extent");
-            if (new_extent[i] < 0)
-              throw Exception ("the kernel extent must be positive");
           }
           if (new_extent.size() == 1)
-            for (unsigned int i = 0; i < 3; i++)
+            for (size_t i = 0; i < 3; i++)
               extent[i] = new_extent[0];
           else
             extent = new_extent;
@@ -181,7 +181,7 @@ namespace MR
         }
 
       protected:
-        vector<int> extent;
+        vector<uint32_t> extent;
         vector<default_type> stdev;
         const vector<size_t> stride_order;
         bool zero_boundary;
@@ -268,8 +268,9 @@ namespace MR
                   }
                 }
                 result /= av_weights;
-              } else if (kernel_size != kernel.size())
-                  result /= kernel.segment(c, kernel_size).sum();
+              } else if (kernel_size != kernel.size()) {
+                result /= kernel.segment(c, kernel_size).sum();
+              }
               image.value() = result;
             }
 

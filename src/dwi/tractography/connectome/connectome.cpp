@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #include "dwi/tractography/connectome/connectome.h"
 #include "dwi/tractography/connectome/metric.h"
@@ -39,7 +41,7 @@ const OptionGroup AssignmentOptions = OptionGroup ("Structural connectome stream
 
   + Option ("assignment_end_voxels", "use a simple voxel lookup value at each streamline endpoint")
 
-  + Option ("assignment_radial_search", "perform a radial search from each streamline endpoint to locate the nearest node.\n"
+  + Option ("assignment_radial_search", "perform a radial search from each streamline endpoint to locate the nearest node. "
                                         "Argument is the maximum radius in mm; if no node is found within this radius, the streamline endpoint is not assigned to any node. "
                                         "Default search distance is " + str(TCK2NODES_RADIAL_DEFAULT_DIST, 2) + "mm.")
     + Argument ("radius").type_float (0.0)
@@ -117,8 +119,14 @@ void setup_metric (Metric& metric, Image<node_t>& nodes_data)
   if (get_options ("scale_invnodevol").size())
     metric.set_scale_invnodevol (nodes_data);
   auto opt = get_options ("scale_file");
-  if (opt.size())
-    metric.set_scale_file (opt[0][0]);
+  if (opt.size()) {
+    try {
+      metric.set_scale_file (opt[0][0]);
+    } catch (Exception& e) {
+      throw Exception (e, "-scale_file option expects a file containing a list of numbers (one for each streamline); "
+                          "file \"" + std::string(opt[0][0]) + "\" does not appear to contain this");
+    }
+  }
 }
 
 

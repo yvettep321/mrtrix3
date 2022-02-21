@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifndef __interp_base_h__
 #define __interp_base_h__
@@ -67,6 +69,7 @@ namespace MR
     template <class ImageType> class Base : public ImageType, public Transform
     { MEMALIGN(Base<ImageType>)
       public:
+        using image_type = ImageType;
         using value_type = typename ImageType::value_type;
 
         //! construct an Interp object to obtain interpolated values using the
@@ -194,22 +197,21 @@ namespace MR
 
         // Some helper functions
         template <class VectorType>
-        bool is_out_of_bounds (const VectorType& pos) const {
-          if (pos[0] <= -0.5 || pos[0] >= bounds[0] ||
-              pos[1] <= -0.5 || pos[1] >= bounds[1] ||
-              pos[2] <= -0.5 || pos[2] >= bounds[2]) {
-            return true;
-          }
-          return false;
+        bool set_out_of_bounds (const VectorType& pos) {
+          return ((out_of_bounds = (pos[0] <= -0.5 || pos[0] >= bounds[0] ||
+                                    pos[1] <= -0.5 || pos[1] >= bounds[1] ||
+                                    pos[2] <= -0.5 || pos[2] >= bounds[2])));
+        }
+
+        void set_out_of_bounds (const bool value) {
+          out_of_bounds = value;
         }
 
         template <class VectorType>
-        Eigen::Vector3 intravoxel_offset (const VectorType& pos) {
-          out_of_bounds = (*this).is_out_of_bounds (pos); // Don't want the equally-named function in image_helpers.h!
-          if (out_of_bounds)
-            return Eigen::Vector3 (NaN, NaN, NaN);
-          else
-            return Eigen::Vector3 (pos[0]-std::floor (pos[0]), pos[1]-std::floor (pos[1]), pos[2]-std::floor (pos[2]));
+        Eigen::Vector3d intravoxel_offset (const VectorType& pos) {
+          if (set_out_of_bounds (pos))
+            return Eigen::Vector3d (NaN, NaN, NaN);
+          return Eigen::Vector3d (pos[0]-std::floor (pos[0]), pos[1]-std::floor (pos[1]), pos[2]-std::floor (pos[2]));
         }
 
     };

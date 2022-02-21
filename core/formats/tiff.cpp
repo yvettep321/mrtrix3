@@ -1,16 +1,18 @@
-/* Copyright (c) 2008-2017 the MRtrix3 contributors.
+/* Copyright (c) 2008-2022 the MRtrix3 contributors.
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, you can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * Covered Software is provided under this License on an "as is"
+ * basis, without warranty of any kind, either expressed, implied, or
+ * statutory, including, without limitation, warranties that the
+ * Covered Software is free of defects, merchantable, fit for a
+ * particular purpose or non-infringing.
+ * See the Mozilla Public License v. 2.0 for more details.
  *
  * For more details, see http://www.mrtrix.org/.
  */
-
 
 #ifdef MRTRIX_TIFF_SUPPORT
 
@@ -33,13 +35,13 @@ namespace MR
       if (! (Path::has_suffix (H.name(), ".tiff") ||
             Path::has_suffix (H.name(), ".tif") ||
             Path::has_suffix (H.name(), ".TIFF") ||
-            Path::has_suffix (H.name(), ".TIF"))) 
+            Path::has_suffix (H.name(), ".TIF")))
         return std::unique_ptr<ImageIO::Base>();
 
       File::TIFF tif (H.name());
 
-      uint32 width(0), height(0);
-      uint16 bpp(0), sampleformat(0), samplesperpixel(0), config (0);
+      uint32_t width(0), height(0);
+      uint16_t bpp(0), sampleformat(0), samplesperpixel(0), config (0);
       size_t ndir = 0;
 
       do {
@@ -55,7 +57,7 @@ namespace MR
 
       H.ndim() = samplesperpixel > 1 ? 4 : 3;
 
-      H.size(0) = width; 
+      H.size(0) = width;
       H.stride(0) = 2;
 
       H.size(1) = height;
@@ -71,7 +73,7 @@ namespace MR
 
       H.datatype() = DataType::Undefined;
       switch (bpp) {
-        case 8: 
+        case 8:
           switch (sampleformat) {
             case 1: H.datatype() = DataType::UInt8; break;
             case 2: H.datatype() = DataType::Int8; break;
@@ -112,7 +114,7 @@ namespace MR
       if (Path::has_suffix (H.name(), ".tiff") ||
           Path::has_suffix (H.name(), ".tif") ||
           Path::has_suffix (H.name(), ".TIFF") ||
-          Path::has_suffix (H.name(), ".TIF")) 
+          Path::has_suffix (H.name(), ".TIF"))
         throw Exception ("TIFF format not supported for output");
 
       return false;
